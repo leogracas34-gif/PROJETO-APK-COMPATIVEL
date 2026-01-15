@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.content.res.Configuration
+import android.graphics.Color
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -21,6 +22,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
+import com.bumptech.glide.load.engine.DiskCacheStrategy
 import com.bumptech.glide.load.resource.bitmap.CenterCrop
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -98,8 +100,8 @@ class DetailsActivity : AppCompatActivity() {
 
     private fun configurarTelaTV() {
         val windowInsetsController = WindowCompat.getInsetsController(window, window.decorView)
-        windowInsetsController?.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-        windowInsetsController?.hide(WindowInsetsCompat.Type.systemBars())
+        windowInsetsController.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        windowInsetsController.hide(WindowInsetsCompat.Type.systemBars())
 
         if (isTelevisionDevice()) {
             requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
@@ -145,8 +147,21 @@ class DetailsActivity : AppCompatActivity() {
         tvPlot.text = "Carregando sinopse..."
         tvYear?.text = "" 
 
-        Glide.with(this).load(icon).placeholder(android.R.drawable.ic_menu_gallery).into(imgPoster)
-        Glide.with(this).load(icon).centerCrop().into(imgBackground)
+        // 1. CORREÇÃO CAPA (POSTER): Leve e Rápido
+        Glide.with(this)
+            .load(icon)
+            .placeholder(android.R.drawable.ic_menu_gallery)
+            .diskCacheStrategy(DiskCacheStrategy.ALL)
+            .override(300, 450) // Tamanho ideal para poster lateral
+            .into(imgPoster)
+
+        // 2. CORREÇÃO FUNDO (BACKDROP): HD Leve para não travar o vídeo
+        Glide.with(this)
+            .load(icon)
+            .diskCacheStrategy(DiskCacheStrategy.ALL)
+            .override(1280, 720) // Essencial para TV Box antiga
+            .centerCrop()
+            .into(imgBackground)
 
         val isFavInicial = getFavMovies(this).contains(streamId)
         atualizarIconeFavorito(isFavInicial)
@@ -278,11 +293,21 @@ class DetailsActivity : AppCompatActivity() {
     }
 
     private fun setupEventos() {
-        // --- Efeito Zoom Controle Remoto ---
+        // --- 3. CORREÇÃO DE FOCO (Amarelo Ouro + Zoom) ---
         val zoomFocus = View.OnFocusChangeListener { v, hasFocus ->
-            v.scaleX = if (hasFocus) 1.1f else 1.0f
-            v.scaleY = if (hasFocus) 1.1f else 1.0f
+            if (hasFocus) {
+                v.animate().scaleX(1.1f).scaleY(1.1f).setDuration(150).start()
+                if (v is Button) {
+                    v.setTextColor(Color.parseColor("#FFD700")) // Amarelo
+                }
+            } else {
+                v.animate().scaleX(1.0f).scaleY(1.0f).setDuration(150).start()
+                if (v is Button) {
+                    v.setTextColor(Color.WHITE) // Volta ao normal
+                }
+            }
         }
+        
         btnPlay.onFocusChangeListener = zoomFocus
         btnResume.onFocusChangeListener = zoomFocus
         btnFavorite.onFocusChangeListener = zoomFocus
@@ -402,7 +427,15 @@ class DetailsActivity : AppCompatActivity() {
                 }
                 
                 v.findViewById<TextView>(R.id.tvEpisodeTitle).text = "S${e.season}E${e.episode}: ${e.title}"
-                Glide.with(v.context).load(e.thumb).centerCrop().into(v.findViewById(R.id.imgEpisodeThumb))
+                
+                // Glide leve também para episódios
+                Glide.with(v.context)
+                    .load(e.thumb)
+                    .diskCacheStrategy(DiskCacheStrategy.ALL)
+                    .override(250, 150) // Thumb leve
+                    .centerCrop()
+                    .into(v.findViewById(R.id.imgEpisodeThumb))
+                    
                 v.setOnClickListener { onEpisodeClick(e) }
             }
         }
