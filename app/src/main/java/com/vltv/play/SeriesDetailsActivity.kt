@@ -14,6 +14,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
+import com.bumptech.glide.load.engine.DiskCacheStrategy
 import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
@@ -90,16 +91,20 @@ class SeriesDetailsActivity : AppCompatActivity() {
 
         btnSeasonSelector.setBackgroundColor(Color.parseColor("#333333"))
 
+        // CORREÇÃO: Glide com estratégia de cache e redimensionamento para TV Box antiga
         Glide.with(this)
             .load(seriesIcon)
             .placeholder(R.mipmap.ic_launcher)
+            .diskCacheStrategy(DiskCacheStrategy.ALL)
+            .override(300, 450) // Reduz memória
             .centerCrop()
             .into(imgPoster)
 
         rvEpisodes.isFocusable = true
         rvEpisodes.isFocusableInTouchMode = true
         rvEpisodes.setHasFixedSize(true)
-        rvEpisodes.layoutManager = androidx.recyclerview.widget.GridLayoutManager(this, 4)
+        // Ajuste de Colunas: 5 para TV ficar bonito
+        rvEpisodes.layoutManager = androidx.recyclerview.widget.GridLayoutManager(this, if (isTelevisionDevice()) 5 else 4)
         
         rvEpisodes.addOnChildAttachStateChangeListener(object : RecyclerView.OnChildAttachStateChangeListener {
             override fun onChildViewAttachedToWindow(view: View) {
@@ -220,7 +225,9 @@ class SeriesDetailsActivity : AppCompatActivity() {
         val url = "https://api.themoviedb.org/3/search/tv?api_key=$apiKey&query=$encodedName&language=pt-BR"
 
         client.newCall(Request.Builder().url(url).build()).enqueue(object : okhttp3.Callback {
-            override fun onFailure(call: okhttp3.Call, e: IOException) {}
+            override fun onFailure(call: okhttp3.Call, e: IOException) {
+                Log.e("TMDB", "Erro na busca: ${e.message}")
+            }
             override fun onResponse(call: okhttp3.Call, response: okhttp3.Response) {
                 val body = response.body()?.string()
                 if (body != null) {
@@ -237,15 +244,19 @@ class SeriesDetailsActivity : AppCompatActivity() {
                                 if (vote > 0) tvRating.text = "Nota: ${String.format("%.1f", vote)}"
                                 val backdropPath = show.optString("backdrop_path")
                                 if (backdropPath.isNotEmpty() && imgBackground != imgPoster) {
+                                    // CORREÇÃO: Limita tamanho da imagem de fundo para evitar tela preta
                                     Glide.with(this@SeriesDetailsActivity)
                                         .load("https://image.tmdb.org/t/p/w1280$backdropPath")
+                                        .diskCacheStrategy(DiskCacheStrategy.ALL)
+                                        .override(800, 450) // Força resolução menor para TV Box antiga
                                         .centerCrop().into(imgBackground)
                                 }
-                                // Mantém poster vertical
                                 Glide.with(this@SeriesDetailsActivity).load(seriesIcon).placeholder(R.mipmap.ic_launcher).centerCrop().into(imgPoster)
                             }
                         }
-                    } catch (e: Exception) {}
+                    } catch (e: Exception) {
+                        Log.e("TMDB", "Erro parse JSON: ${e.message}")
+                    }
                 }
             }
         })
@@ -528,15 +539,26 @@ class SeriesDetailsActivity : AppCompatActivity() {
             holder.tvTitle.text = "E${ep.episode_num.toString().padStart(2, '0')} - ${ep.title}"
             
             if (holder.imgThumb != null) {
-                Glide.with(holder.itemView.context).load(ep.info?.movie_image)
-                    .placeholder(android.R.drawable.ic_menu_gallery).error(android.R.color.darker_gray).centerCrop().into(holder.imgThumb)
+                // CORREÇÃO: Limita tamanho da capa para não estourar memória na TV antiga
+                Glide.with(holder.itemView.context)
+                    .load(ep.info?.movie_image)
+                    .placeholder(android.R.drawable.ic_menu_gallery)
+                    .error(android.R.color.darker_gray)
+                    .override(300, 200) // Mais leve
+                    .diskCacheStrategy(DiskCacheStrategy.ALL)
+                    .centerCrop()
+                    .into(holder.imgThumb)
             }
             holder.itemView.setOnClickListener { onClick(ep, position) }
-            holder.itemView.setOnFocusChangeListener { _, hasFocus ->
+            holder.itemView.setOnFocusChangeListener { view, hasFocus ->
                 if (hasFocus) {
-                    holder.tvTitle.setTextColor(Color.YELLOW)
-                    holder.tvTitle.setBackgroundColor(Color.parseColor("#CC000000"))
+                    // EFEITO DE ZOOM E COR FORTE (AMARELO OURO)
+                    view.animate().scaleX(1.08f).scaleY(1.08f).setDuration(150).start()
+                    holder.tvTitle.setTextColor(Color.parseColor("#FFD700")) // Amarelo Ouro
+                    holder.tvTitle.setBackgroundColor(Color.parseColor("#E6000000")) // Fundo mais escuro
                 } else {
+                    // VOLTA AO NORMAL
+                    view.animate().scaleX(1.0f).scaleY(1.0f).setDuration(150).start()
                     holder.tvTitle.setTextColor(Color.WHITE)
                     holder.tvTitle.setBackgroundColor(Color.parseColor("#D9000000"))
                 }
