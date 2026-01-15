@@ -13,6 +13,7 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.bumptech.glide.Glide
+import com.bumptech.glide.load.engine.DiskCacheStrategy
 import com.vltv.play.databinding.ActivityHomeBinding
 import com.vltv.play.DownloadHelper
 import kotlinx.coroutines.CoroutineScope
@@ -243,17 +244,19 @@ class HomeActivity : AppCompatActivity() {
 
                     if (backdropPath != "null" && backdropPath.isNotBlank()) {
                         
-                        // 6. Usa imagem ORIGINAL (Full HD/4K) para ficar bom na TV
-                        val imageUrl = "https://image.tmdb.org/t/p/original$backdropPath"
+                        // CORREÇÃO TV BOX: Usar 'w1280' em vez de 'original'
+                        // Isso reduz drasticamente o consumo de memória, evitando fundo preto
+                        val imageUrl = "https://image.tmdb.org/t/p/w1280$backdropPath"
 
                         withContext(Dispatchers.Main) {
                             binding.tvBannerTitle.text = "$prefixo$titulo"
                             binding.tvBannerOverview.text = overview
 
-                            // 7. Carrega com CenterCrop para preencher a tela inteira sem bordas
                             Glide.with(this@HomeActivity)
                                 .load(imageUrl)
-                                .centerCrop() // O segredo para ajustar à tela da TV
+                                .diskCacheStrategy(DiskCacheStrategy.ALL) // Salva em cache
+                                .override(1280, 720) // Força resolução HD segura
+                                .centerCrop()
                                 .placeholder(android.R.color.black)
                                 .into(binding.imgBanner)
                         }
