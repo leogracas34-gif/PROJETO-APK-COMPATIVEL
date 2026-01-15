@@ -77,6 +77,8 @@ class PlayerActivity : AppCompatActivity() {
     private val USER_AGENT = "IPTVSmartersPro"
 
     private val handler = Handler(Looper.getMainLooper())
+    
+    // --- CORREÇÃO DE FOCO AQUI ---
     private val nextChecker = object : Runnable {
         override fun run() {
             val p = player ?: return
@@ -88,7 +90,13 @@ class PlayerActivity : AppCompatActivity() {
                     if (remaining in 1..60_000) {
                         val seconds = (remaining / 1000L).toInt()
                         tvNextEpisodeTitle.text = "Próximo episódio em ${seconds}s"
-                        nextEpisodeContainer.visibility = View.VISIBLE
+                        
+                        // Se não estava visível, torna visível e PUXA O FOCO para o botão
+                        if (nextEpisodeContainer.visibility != View.VISIBLE) {
+                            nextEpisodeContainer.visibility = View.VISIBLE
+                            btnPlayNextEpisode.requestFocus()
+                        }
+                        
                         if (remaining <= 1000L) {
                             nextEpisodeContainer.visibility = View.GONE
                         }
@@ -551,6 +559,7 @@ class PlayerActivity : AppCompatActivity() {
         })
     }
 
+    // --- CORREÇÃO DO BOTÃO OK/ENTER ---
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         val p = player ?: return super.onKeyDown(keyCode, event)
         
@@ -568,12 +577,22 @@ class PlayerActivity : AppCompatActivity() {
                 true
             }
             KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
-                if (nextStreamId != 0 && streamType == "series") {
+                // Prioridade 1: Se o botão "Próximo" está na tela, o OK clica nele
+                if (nextEpisodeContainer.visibility == View.VISIBLE) {
                     abrirProximoEpisodio()
-                    true
-                } else {
-                    super.onKeyDown(keyCode, event)
+                    return true
                 }
+                
+                // Prioridade 2: Se não tem botão próximo, o OK controla a barra (Sem dar Zoom)
+                if (playerView.isControllerFullyVisible) {
+                    // Se já tá visível, alterna play/pause
+                    if (player?.isPlaying == true) player?.pause() else player?.play()
+                } else {
+                    // Se tá escondido, mostra a barra de tempo
+                    playerView.showController()
+                }
+                // Retorna true para impedir que o sistema faça o "Zoom" padrão
+                true
             }
             KeyEvent.KEYCODE_BACK -> {
                 finish()
