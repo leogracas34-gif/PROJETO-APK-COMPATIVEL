@@ -3,6 +3,7 @@ package com.vltv.play
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
+import android.graphics.Color
 import android.os.Bundle
 import android.view.KeyEvent
 import android.view.LayoutInflater
@@ -48,10 +49,8 @@ class VodActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_live_tv)
-        val windowInsetsController = WindowCompat.getInsetsController(window,
-        window.decorView)
-        windowInsetsController.systemBarsBehavior =
-        WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        val windowInsetsController = WindowCompat.getInsetsController(window, window.decorView)
+        windowInsetsController.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         windowInsetsController.hide(WindowInsetsCompat.Type.systemBars())
 
         rvCategories = findViewById(R.id.rvCategories)
@@ -71,6 +70,7 @@ class VodActivity : AppCompatActivity() {
         rvCategories.isFocusable = true
         rvCategories.descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
 
+        // Mantendo 5 colunas para TV
         rvMovies.layoutManager = GridLayoutManager(this, 5)
         rvMovies.isFocusable = true
         rvMovies.descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
@@ -356,7 +356,6 @@ class VodActivity : AppCompatActivity() {
             .apply()
 
         Toast.makeText(this, "Baixando: ${filme.name}", Toast.LENGTH_LONG).show()
-        // aqui depois entra DownloadManager ou ExoPlayer offline usando 'url'
     }
 
     private fun pausarDownload(streamId: Int) {
@@ -400,21 +399,20 @@ class VodActivity : AppCompatActivity() {
             val item = list[position]
             holder.tvName.text = item.name
 
-            if (selectedPos == position) {
-                holder.tvName.setTextColor(
-                    holder.itemView.context.getColor(R.color.red_primary)
-                )
+            // Lógica de seleção (Mantida, mas melhorada)
+            val isSelected = (selectedPos == position)
+            if (isSelected) {
+                holder.tvName.setTextColor(holder.itemView.context.getColor(R.color.red_primary))
                 holder.tvName.setBackgroundColor(0xFF252525.toInt())
             } else {
-                holder.tvName.setTextColor(
-                    holder.itemView.context.getColor(R.color.gray_text)
-                )
+                holder.tvName.setTextColor(holder.itemView.context.getColor(R.color.gray_text))
                 holder.tvName.setBackgroundColor(0x00000000)
             }
 
             holder.itemView.isFocusable = true
             holder.itemView.isClickable = true
 
+            // Foco Visual nas Categorias
             holder.itemView.setOnFocusChangeListener { _, hasFocus ->
                 if (hasFocus) {
                     holder.tvName.setTextColor(holder.itemView.context.getColor(R.color.red_primary))
@@ -460,9 +458,11 @@ class VodActivity : AppCompatActivity() {
             val item = list[position]
             holder.tvName.text = item.name
 
+            // CORREÇÃO GLIDE: override para economizar memória e mostrar capas na TV antiga
             Glide.with(holder.itemView.context)
                 .load(item.icon)
-                .diskCacheStrategy(DiskCacheStrategy.AUTOMATIC)
+                .diskCacheStrategy(DiskCacheStrategy.ALL) // Cache total
+                .override(300, 450) // Força tamanho pequeno para não estourar memória
                 .placeholder(R.drawable.bg_logo_placeholder)
                 .error(R.drawable.bg_logo_placeholder)
                 .centerCrop()
@@ -471,8 +471,22 @@ class VodActivity : AppCompatActivity() {
             holder.itemView.isFocusable = true
             holder.itemView.isClickable = true
 
-            holder.itemView.setOnFocusChangeListener { _, hasFocus ->
-                holder.itemView.alpha = if (hasFocus) 1.0f else 0.8f
+            // LÓGICA DE FOCO (Amarelo e Zoom)
+            holder.itemView.setOnFocusChangeListener { view, hasFocus ->
+                if (hasFocus) {
+                    // Efeito de Zoom
+                    view.animate().scaleX(1.1f).scaleY(1.1f).setDuration(150).start()
+                    // Cor Amarelo Ouro
+                    holder.tvName.setTextColor(Color.parseColor("#FFD700"))
+                    holder.tvName.setBackgroundColor(Color.parseColor("#CC000000")) // Fundo escuro para ler melhor
+                    view.alpha = 1.0f
+                } else {
+                    // Volta ao normal
+                    view.animate().scaleX(1.0f).scaleY(1.0f).setDuration(150).start()
+                    holder.tvName.setTextColor(Color.WHITE)
+                    holder.tvName.setBackgroundColor(Color.parseColor("#00000000")) // Transparente
+                    view.alpha = 1.0f
+                }
             }
 
             holder.itemView.setOnClickListener { onClick(item) }
