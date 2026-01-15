@@ -2,6 +2,7 @@ package com.vltv.play
 
 import android.content.Context
 import android.content.Intent
+import android.graphics.Color
 import android.os.Bundle
 import android.util.Base64
 import android.view.KeyEvent
@@ -71,7 +72,7 @@ class LiveTvActivity : AppCompatActivity() {
         rvCategories.isFocusable = true
         rvCategories.descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
 
-        // Mantendo o GridLayoutManager (5 colunas) como você pediu
+        // Mantendo o GridLayoutManager (4 colunas) como você pediu
         rvChannels.layoutManager = GridLayoutManager(this, 4)
         rvChannels.isFocusable = true
         rvChannels.descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
@@ -264,7 +265,9 @@ class LiveTvActivity : AppCompatActivity() {
             val item = list[position]
             holder.tvName.text = item.name
 
-            if (selectedPos == position) {
+            // Lógica visual de seleção
+            val isSelected = (selectedPos == position)
+            if (isSelected) {
                 holder.tvName.setTextColor(holder.itemView.context.getColor(R.color.red_primary))
                 holder.tvName.setBackgroundColor(0xFF252525.toInt())
             } else {
@@ -275,6 +278,7 @@ class LiveTvActivity : AppCompatActivity() {
             holder.itemView.isFocusable = true
             holder.itemView.isClickable = true
 
+            // FOCO AMARELO + ZOOM (TV)
             holder.itemView.setOnFocusChangeListener { _, hasFocus ->
                 if (hasFocus) {
                     holder.tvName.setTextColor(holder.itemView.context.getColor(R.color.red_primary))
@@ -299,7 +303,7 @@ class LiveTvActivity : AppCompatActivity() {
     }
 
     // --------------------
-    // ADAPTER DOS CANAIS + EPG (CORRIGIDO COM A LÓGICA DO ARQUIVO ANTIGO)
+    // ADAPTER DOS CANAIS + EPG (CORRIGIDO COM FOCO AMARELO)
     // --------------------
     inner class ChannelAdapter(
         private val list: List<LiveStream>,
@@ -328,9 +332,11 @@ class LiveTvActivity : AppCompatActivity() {
 
             holder.tvName.text = item.name
 
+            // CORREÇÃO GLIDE: override para logos (quadrados pequenos)
             Glide.with(holder.itemView.context)
                 .load(item.icon)
-                .diskCacheStrategy(DiskCacheStrategy.AUTOMATIC)
+                .diskCacheStrategy(DiskCacheStrategy.ALL)
+                .override(150, 150) // Leveza máxima
                 .placeholder(R.drawable.bg_logo_placeholder)
                 .error(R.drawable.bg_logo_placeholder)
                 .centerCrop()
@@ -342,8 +348,22 @@ class LiveTvActivity : AppCompatActivity() {
             holder.itemView.isFocusable = true
             holder.itemView.isClickable = true
 
-            holder.itemView.setOnFocusChangeListener { _, hasFocus ->
-                holder.itemView.alpha = if (hasFocus) 1.0f else 0.8f
+            // LÓGICA DE FOCO (Amarelo e Zoom)
+            holder.itemView.setOnFocusChangeListener { view, hasFocus ->
+                if (hasFocus) {
+                    // Zoom leve
+                    view.animate().scaleX(1.05f).scaleY(1.05f).setDuration(150).start()
+                    // Cor Amarelo Ouro
+                    holder.tvName.setTextColor(Color.parseColor("#FFD700"))
+                    holder.tvName.setBackgroundColor(Color.parseColor("#E6000000")) // Fundo escuro para ler melhor
+                    view.alpha = 1.0f
+                } else {
+                    // Normal
+                    view.animate().scaleX(1.0f).scaleY(1.0f).setDuration(150).start()
+                    holder.tvName.setTextColor(Color.WHITE)
+                    holder.tvName.setBackgroundColor(Color.parseColor("#00000000")) // Transparente
+                    view.alpha = 1.0f
+                }
             }
 
             holder.itemView.setOnClickListener { onClick(item) }
