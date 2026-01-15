@@ -1,5 +1,6 @@
 package com.vltv.play
 
+import android.graphics.Color
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -21,6 +22,7 @@ class SearchResultAdapter(
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
+        // Usa o layout item_vod para manter o padrão visual de capas
         val v = LayoutInflater.from(parent.context)
             .inflate(R.layout.item_vod, parent, false)
         return VH(v)
@@ -30,22 +32,37 @@ class SearchResultAdapter(
         val item = getItem(position)
         holder.tvName.text = item.title
 
-        // Usando o campo iconUrl que definimos no SearchResultItem
+        // 1. CORREÇÃO GLIDE: Carregamento leve para Busca
         Glide.with(holder.itemView.context)
             .load(item.iconUrl)
-            .placeholder(R.mipmap.ic_launcher)
+            .placeholder(R.mipmap.ic_launcher) // Mantive seu ícone original
             .error(R.mipmap.ic_launcher)
-            .diskCacheStrategy(DiskCacheStrategy.ALL) // Cache para ser mais rápido
+            .diskCacheStrategy(DiskCacheStrategy.ALL)
+            .override(200, 300) // Reduz tamanho para não travar a rolagem
+            .centerCrop()
             .into(holder.imgPoster)
 
-        // Lógica de foco para Android TV / TV Box
+        // 2. FOCO VISUAL OTIMIZADO (Igual Filmes/Séries)
         holder.itemView.isFocusable = true
         holder.itemView.isClickable = true
-        holder.itemView.setOnFocusChangeListener { _, hasFocus ->
-            // Efeito visual de foco
-            holder.itemView.alpha = if (hasFocus) 1.0f else 0.8f
-            holder.itemView.scaleX = if (hasFocus) 1.05f else 1.0f
-            holder.itemView.scaleY = if (hasFocus) 1.05f else 1.0f
+        
+        holder.itemView.setOnFocusChangeListener { view, hasFocus ->
+            if (hasFocus) {
+                // Efeito de Zoom mais forte
+                view.animate().scaleX(1.1f).scaleY(1.1f).setDuration(150).start()
+                
+                // Texto Amarelo Ouro e Fundo Escuro para leitura
+                holder.tvName.setTextColor(Color.parseColor("#FFD700"))
+                holder.tvName.setBackgroundColor(Color.parseColor("#CC000000"))
+                view.alpha = 1.0f
+            } else {
+                // Volta ao normal
+                view.animate().scaleX(1.0f).scaleY(1.0f).setDuration(150).start()
+                
+                holder.tvName.setTextColor(Color.WHITE)
+                holder.tvName.setBackgroundColor(Color.parseColor("#00000000")) // Transparente
+                view.alpha = 1.0f
+            }
         }
 
         holder.itemView.setOnClickListener { onClick(item) }
