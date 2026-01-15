@@ -1,17 +1,14 @@
 package com.vltv.play
 
 import android.content.Intent
-import android.graphics.Color
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
-import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
 import android.widget.EditText
 import android.widget.ImageButton
-import android.widget.ImageView
 import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
@@ -21,19 +18,8 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import com.bumptech.glide.Glide
-import com.bumptech.glide.load.engine.DiskCacheStrategy
 import kotlinx.coroutines.*
 import kotlin.coroutines.CoroutineContext
-
-// Classe de dados para os resultados (Adicionada aqui para garantir compatibilidade)
-data class SearchResultItem(
-    val id: Int,
-    val title: String,
-    val type: String, // "movie", "series", "live"
-    val extraInfo: String?,
-    val iconUrl: String?
-)
 
 class SearchActivity : AppCompatActivity(), CoroutineScope {
 
@@ -80,7 +66,6 @@ class SearchActivity : AppCompatActivity(), CoroutineScope {
     }
 
     private fun setupRecyclerView() {
-        // Inicializa o adapter interno com a lógica de clique
         adapter = SearchResultAdapter { item ->
             abrirDetalhes(item)
         }
@@ -251,6 +236,7 @@ class SearchActivity : AppCompatActivity(), CoroutineScope {
     private fun buscarCanais(u: String, p: String): List<SearchResultItem> {
         return try {
             // categoryId="0" ou similar para pegar todos, depende da sua API. 
+            // Se "0" falhar, tente sem categoryId ou implemente lógica de pegar categorias primeiro.
             val response = XtreamApi.service.getLiveStreams(u, p, categoryId = "0").execute()
             if (response.isSuccessful && response.body() != null) {
                 response.body()!!.map {
@@ -259,7 +245,7 @@ class SearchActivity : AppCompatActivity(), CoroutineScope {
                         title = it.name ?: "Sem Nome",
                         type = "live",
                         extraInfo = null,
-                        iconUrl = it.icon 
+                        iconUrl = it.icon // Verifique se na sua API é 'icon' ou 'stream_icon'
                     )
                 }
             } else emptyList()
@@ -298,68 +284,5 @@ class SearchActivity : AppCompatActivity(), CoroutineScope {
     override fun onDestroy() {
         super.onDestroy()
         supervisor.cancel()
-    }
-
-    // =========================================================================
-    // ADAPTER INTERNO CORRIGIDO (Foco Amarelo + Capas Leves)
-    // =========================================================================
-    inner class SearchResultAdapter(
-        private val onClick: (SearchResultItem) -> Unit
-    ) : RecyclerView.Adapter<SearchResultAdapter.VH>() {
-
-        private var items: List<SearchResultItem> = emptyList()
-
-        fun submitList(newItems: List<SearchResultItem>) {
-            items = newItems
-            notifyDataSetChanged()
-        }
-
-        inner class VH(v: View) : RecyclerView.ViewHolder(v) {
-            val tvName: TextView = v.findViewById(R.id.tvName)
-            val imgPoster: ImageView = v.findViewById(R.id.imgPoster)
-        }
-
-        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
-            val v = LayoutInflater.from(parent.context)
-                .inflate(R.layout.item_vod, parent, false) // Usa o mesmo layout de filmes
-            return VH(v)
-        }
-
-        override fun onBindViewHolder(holder: VH, position: Int) {
-            val item = items[position]
-            holder.tvName.text = item.title
-
-            // CORREÇÃO: Limita o tamanho da imagem para busca rápida
-            Glide.with(holder.itemView.context)
-                .load(item.iconUrl)
-                .diskCacheStrategy(DiskCacheStrategy.ALL)
-                .override(200, 300) // Imagem bem leve para lista de busca
-                .placeholder(R.drawable.bg_logo_placeholder)
-                .error(R.drawable.bg_logo_placeholder)
-                .centerCrop()
-                .into(holder.imgPoster)
-
-            holder.itemView.isFocusable = true
-            holder.itemView.isClickable = true
-
-            // LÓGICA DE FOCO (Amarelo e Zoom) IGUAL DA HOME
-            holder.itemView.setOnFocusChangeListener { view, hasFocus ->
-                if (hasFocus) {
-                    view.animate().scaleX(1.1f).scaleY(1.1f).setDuration(150).start()
-                    holder.tvName.setTextColor(Color.parseColor("#FFD700")) // Amarelo
-                    holder.tvName.setBackgroundColor(Color.parseColor("#CC000000"))
-                    view.alpha = 1.0f
-                } else {
-                    view.animate().scaleX(1.0f).scaleY(1.0f).setDuration(150).start()
-                    holder.tvName.setTextColor(Color.WHITE)
-                    holder.tvName.setBackgroundColor(Color.parseColor("#00000000"))
-                    view.alpha = 1.0f
-                }
-            }
-
-            holder.itemView.setOnClickListener { onClick(item) }
-        }
-
-        override fun getItemCount() = items.size
     }
 }
