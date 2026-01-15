@@ -3,6 +3,7 @@ package com.vltv.play
 import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
+import android.graphics.Color
 import android.os.Bundle
 import android.view.KeyEvent
 import android.view.inputmethod.EditorInfo
@@ -82,12 +83,35 @@ class HomeActivity : AppCompatActivity() {
                    android.content.res.Configuration.UI_MODE_TYPE_TELEVISION
         }
 
-        // Configura Settings (TV + Celular)
+        // --- 1. SETUP DO BOTÃO DE BUSCA (FOCO AMARELO + ZOOM) ---
+        binding.etSearch.isFocusable = true
+        binding.etSearch.isFocusableInTouchMode = true // Importante para TV Híbrida
+        
+        binding.etSearch.setOnFocusChangeListener { v, hasFocus ->
+            if (hasFocus) {
+                // Efeito Zoom
+                v.animate().scaleX(1.1f).scaleY(1.1f).setDuration(150).start()
+                // Muda a cor do texto de dica para Amarelo Ouro
+                binding.etSearch.setHintTextColor(Color.parseColor("#FFD700"))
+            } else {
+                // Volta ao normal
+                v.animate().scaleX(1.0f).scaleY(1.0f).setDuration(150).start()
+                // Volta a cor original (Branco/Cinza Claro)
+                binding.etSearch.setHintTextColor(Color.WHITE)
+            }
+        }
+
+        // --- 2. SETUP DO BOTÃO SETTINGS (FOCO AMARELO + ZOOM) ---
         binding.btnSettings.isFocusable = true
         binding.btnSettings.isFocusableInTouchMode = true
-        binding.btnSettings.setOnFocusChangeListener { _, hasFocus ->
-            binding.btnSettings.scaleX = if (hasFocus) 1.05f else 1f
-            binding.btnSettings.scaleY = if (hasFocus) 1.05f else 1f
+        binding.btnSettings.setOnFocusChangeListener { v, hasFocus ->
+            if (hasFocus) {
+                v.animate().scaleX(1.1f).scaleY(1.1f).setDuration(150).start()
+                binding.btnSettings.setColorFilter(Color.parseColor("#FFD700")) // Ícone Amarelo
+            } else {
+                v.animate().scaleX(1.0f).scaleY(1.0f).setDuration(150).start()
+                binding.btnSettings.clearColorFilter() // Volta ao original
+            }
         }
 
         // Lista de cards para setup comum
