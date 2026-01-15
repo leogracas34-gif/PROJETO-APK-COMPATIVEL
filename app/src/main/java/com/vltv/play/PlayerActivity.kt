@@ -2,6 +2,7 @@ package com.vltv.play
 
 import android.content.Context
 import android.content.Intent
+import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
@@ -94,6 +95,9 @@ class PlayerActivity : AppCompatActivity() {
                         // Se não estava visível, torna visível e PUXA O FOCO para o botão
                         if (nextEpisodeContainer.visibility != View.VISIBLE) {
                             nextEpisodeContainer.visibility = View.VISIBLE
+                            
+                            // TRUQUE: Esconde a barra para o foco ir direto para o botão Próximo
+                            playerView.hideController()
                             btnPlayNextEpisode.requestFocus()
                         }
                         
@@ -133,11 +137,8 @@ class PlayerActivity : AppCompatActivity() {
         tvNextEpisodeTitle = findViewById(R.id.tvNextEpisodeTitle)
         btnPlayNextEpisode = findViewById(R.id.btnPlayNextEpisode)
 
-        btnPlayNextEpisode.isFocusable = true
-        btnPlayNextEpisode.isFocusableInTouchMode = true
-        btnPlayNextEpisode.setOnFocusChangeListener { _, hasFocus ->
-            btnPlayNextEpisode.isSelected = hasFocus
-        }
+        // --- 1. APLICAÇÃO DO VISUAL AMARELO/ZOOM NOS BOTÕES ---
+        setupFocusVisuals()
 
         streamId = intent.getIntExtra("stream_id", 0)
         streamExtension = intent.getStringExtra("stream_ext") ?: "ts"
@@ -214,6 +215,33 @@ class PlayerActivity : AppCompatActivity() {
 
         if (streamType == "series" && nextStreamId != 0) {
             handler.post(nextChecker)
+        }
+    }
+
+    private fun setupFocusVisuals() {
+        // Botão Próximo Episódio: Amarelo Ouro e Zoom
+        btnPlayNextEpisode.isFocusable = true
+        btnPlayNextEpisode.isFocusableInTouchMode = true
+        btnPlayNextEpisode.setOnFocusChangeListener { v, hasFocus ->
+            if (hasFocus) {
+                v.animate().scaleX(1.1f).scaleY(1.1f).setDuration(150).start()
+                btnPlayNextEpisode.setTextColor(Color.parseColor("#FFD700"))
+            } else {
+                v.animate().scaleX(1.0f).scaleY(1.0f).setDuration(150).start()
+                btnPlayNextEpisode.setTextColor(Color.WHITE)
+            }
+        }
+
+        // Botão Aspecto: Zoom
+        btnAspect.isFocusable = true
+        btnAspect.setOnFocusChangeListener { v, hasFocus ->
+            if (hasFocus) {
+                v.animate().scaleX(1.2f).scaleY(1.2f).setDuration(150).start()
+                v.setBackgroundColor(Color.parseColor("#33FFFFFF"))
+            } else {
+                v.animate().scaleX(1.0f).scaleY(1.0f).setDuration(150).start()
+                v.setBackgroundColor(Color.TRANSPARENT)
+            }
         }
     }
 
@@ -330,7 +358,7 @@ class PlayerActivity : AppCompatActivity() {
 
         val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory)
 
-        // CONFIGURAÇÃO TURBO (Para abrir filmes rápido)
+        // CONFIGURAÇÃO TURBO
         val isLive = streamType == "live"
         val minBufferMs = if (isLive) 2000 else 2000
         val maxBufferMs = if (isLive) 5000 else 15000
@@ -404,34 +432,30 @@ class PlayerActivity : AppCompatActivity() {
         var novoTitulo = nextChannelName
         val tituloAtual = tvChannelName.text.toString()
 
-        // Se o nome for genérico, calculamos o número
         if (novoTitulo == null || novoTitulo.equals("Próximo Episódio", ignoreCase = true) || novoTitulo == tituloAtual) {
             
-            // Regex procura: "E02", "E2", "Episodio 02"
             val regex = Regex("(?i)(E|Episódio|Episodio|Episode)\\s*0*(\\d+)")
             val match = regex.find(tituloAtual)
             
             if (match != null) {
                 try {
-                    val textoCompletoEncontrado = match.groupValues[0] // Ex: "E02"
-                    val prefixo = match.groupValues[1] // Ex: "E"
-                    val numeroStr = match.groupValues[2] // Ex: "2"
+                    val textoCompletoEncontrado = match.groupValues[0] 
+                    val prefixo = match.groupValues[1] 
+                    val numeroStr = match.groupValues[2] 
                     
                     val numeroAtual = numeroStr.toInt()
                     val novoNumero = numeroAtual + 1
                     
-                    // Mantém o zero na frente se tinha antes (Ex: "03")
                     val novoNumeroStr = if (numeroStr.length > 1 && novoNumero < 10) 
                         "0$novoNumero" else novoNumero.toString()
                         
-                    // Substitui no texto original: "Lista Negra E02" -> "Lista Negra E03"
                     novoTitulo = tituloAtual.replace(textoCompletoEncontrado, "$prefixo$novoNumeroStr")
                     
                 } catch (e: Exception) {
-                    novoTitulo = tituloAtual // Falhou, mantém o atual
+                    novoTitulo = tituloAtual 
                 }
             } else {
-                novoTitulo = tituloAtual // Não achou número, mantém o atual
+                novoTitulo = tituloAtual 
             }
         }
 
@@ -439,7 +463,7 @@ class PlayerActivity : AppCompatActivity() {
         intent.putExtra("stream_id", nextStreamId)
         intent.putExtra("stream_ext", "mp4")
         intent.putExtra("stream_type", "series")
-        intent.putExtra("channel_name", novoTitulo) // Usa o nome calculado
+        intent.putExtra("channel_name", novoTitulo) 
         
         if (episodeList.isNotEmpty()) {
             intent.putIntegerArrayListExtra("episode_list", episodeList)
@@ -448,7 +472,6 @@ class PlayerActivity : AppCompatActivity() {
         startActivity(intent)
         finish()
     }
-    // ----------------------------------------------
 
     private fun getMovieKey(id: Int) = "movie_resume_$id"
 
@@ -559,10 +582,25 @@ class PlayerActivity : AppCompatActivity() {
         })
     }
 
-    // --- CORREÇÃO DO BOTÃO OK/ENTER ---
+    // --- CORREÇÃO DA NAVEGAÇÃO (SETAS E OK) ---
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        // 1. Se o botão "Próximo Episódio" apareceu, o OK clica nele imediatamente
+        if (nextEpisodeContainer.visibility == View.VISIBLE && 
+           (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER)) {
+             abrirProximoEpisodio()
+             return true
+        }
+
+        // 2. SE A BARRA ESTIVER VISÍVEL: Libera as setas para navegar na Linha do Tempo
+        if (playerView.isControllerFullyVisible) {
+            // Retorna 'super' para deixar o Android controlar o foco (ir para a barra, play, pause, etc)
+            // Assim, se você apertar OK, ele clica no que estiver focado (Barra ou Play)
+            // Se apertar Baixo, ele desce para a barra. Se apertar Esquerda/Direita na barra, ele corre o filme.
+            return super.onKeyDown(keyCode, event)
+        }
+
+        // 3. SE A BARRA ESTIVER ESCONDIDA: Usa os atalhos rápidos
         val p = player ?: return super.onKeyDown(keyCode, event)
-        
         return when (keyCode) {
             KeyEvent.KEYCODE_DPAD_LEFT -> {
                 val newPos = (p.currentPosition - 10_000L).coerceAtLeast(0L)
@@ -577,21 +615,8 @@ class PlayerActivity : AppCompatActivity() {
                 true
             }
             KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
-                // Prioridade 1: Se o botão "Próximo" está na tela, o OK clica nele
-                if (nextEpisodeContainer.visibility == View.VISIBLE) {
-                    abrirProximoEpisodio()
-                    return true
-                }
-                
-                // Prioridade 2: Se não tem botão próximo, o OK controla a barra (Sem dar Zoom)
-                if (playerView.isControllerFullyVisible) {
-                    // Se já tá visível, alterna play/pause
-                    if (player?.isPlaying == true) player?.pause() else player?.play()
-                } else {
-                    // Se tá escondido, mostra a barra de tempo
-                    playerView.showController()
-                }
-                // Retorna true para impedir que o sistema faça o "Zoom" padrão
+                // Se estava escondido, mostra a barra para você poder navegar
+                playerView.showController()
                 true
             }
             KeyEvent.KEYCODE_BACK -> {
