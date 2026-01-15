@@ -2,6 +2,7 @@ package com.vltv.play
 
 import android.content.Context
 import android.content.Intent
+import android.graphics.Color
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -59,17 +60,39 @@ class SeriesActivity : AppCompatActivity() {
         username = prefs.getString("username", "") ?: ""
         password = prefs.getString("password", "") ?: ""
 
+        // ✅ FOCO TV + D-PAD
+        setupRecyclerFocus()
+
         rvCategories.layoutManager = LinearLayoutManager(this, RecyclerView.VERTICAL, false)
         rvCategories.setHasFixedSize(true)
         rvCategories.isFocusable = true
         rvCategories.descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
 
+        // Mantendo 5 colunas para TV
         rvSeries.layoutManager = GridLayoutManager(this, 5)
         rvSeries.isFocusable = true
         rvSeries.descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
         rvSeries.setHasFixedSize(true)
 
+        // ✅ Foco inicial categorias TV
+        rvCategories.requestFocus()
+
         carregarCategorias()
+    }
+
+    // ✅ MELHOR NAVEGAÇÃO ENTRE RECYCLERVIEWS (TV)
+    private fun setupRecyclerFocus() {
+        rvCategories.setOnFocusChangeListener { _, hasFocus ->
+            if (hasFocus) {
+                rvCategories.smoothScrollToPosition(0)
+            }
+        }
+        
+        rvSeries.setOnFocusChangeListener { _, hasFocus ->
+            if (hasFocus) {
+                rvSeries.smoothScrollToPosition(0)
+            }
+        }
     }
 
     // -------- helper p/ detectar adulto --------
@@ -295,21 +318,20 @@ class SeriesActivity : AppCompatActivity() {
             val item = list[position]
             holder.tvName.text = item.name
 
-            if (selectedPos == position) {
-                holder.tvName.setTextColor(
-                    holder.itemView.context.getColor(R.color.red_primary)
-                )
+            // Lógica visual de seleção
+            val isSelected = (selectedPos == position)
+            if (isSelected) {
+                holder.tvName.setTextColor(holder.itemView.context.getColor(R.color.red_primary))
                 holder.tvName.setBackgroundColor(0xFF252525.toInt())
             } else {
-                holder.tvName.setTextColor(
-                    holder.itemView.context.getColor(R.color.gray_text)
-                )
+                holder.tvName.setTextColor(holder.itemView.context.getColor(R.color.gray_text))
                 holder.tvName.setBackgroundColor(0x00000000)
             }
 
             holder.itemView.isFocusable = true
             holder.itemView.isClickable = true
 
+            // Foco Visual nas Categorias (TV)
             holder.itemView.setOnFocusChangeListener { _, hasFocus ->
                 if (hasFocus) {
                     holder.tvName.setTextColor(holder.itemView.context.getColor(R.color.red_primary))
@@ -353,9 +375,11 @@ class SeriesActivity : AppCompatActivity() {
             val item = list[position]
             holder.tvName.text = item.name
 
+            // CORREÇÃO GLIDE: override para economizar memória e mostrar capas na TV antiga
             Glide.with(holder.itemView.context)
                 .load(item.icon)
-                .diskCacheStrategy(DiskCacheStrategy.AUTOMATIC)
+                .diskCacheStrategy(DiskCacheStrategy.ALL) // Cache total
+                .override(300, 450) // Força tamanho pequeno para não estourar memória
                 .placeholder(R.drawable.bg_logo_placeholder)
                 .error(R.drawable.bg_logo_placeholder)
                 .centerCrop()
@@ -364,8 +388,22 @@ class SeriesActivity : AppCompatActivity() {
             holder.itemView.isFocusable = true
             holder.itemView.isClickable = true
 
-            holder.itemView.setOnFocusChangeListener { _, hasFocus ->
-                holder.itemView.alpha = if (hasFocus) 1.0f else 0.8f
+            // LÓGICA DE FOCO (Amarelo e Zoom)
+            holder.itemView.setOnFocusChangeListener { view, hasFocus ->
+                if (hasFocus) {
+                    // Efeito de Zoom
+                    view.animate().scaleX(1.1f).scaleY(1.1f).setDuration(150).start()
+                    // Cor Amarelo Ouro
+                    holder.tvName.setTextColor(Color.parseColor("#FFD700"))
+                    holder.tvName.setBackgroundColor(Color.parseColor("#CC000000")) // Fundo escuro
+                    view.alpha = 1.0f
+                } else {
+                    // Volta ao normal
+                    view.animate().scaleX(1.0f).scaleY(1.0f).setDuration(150).start()
+                    holder.tvName.setTextColor(Color.WHITE)
+                    holder.tvName.setBackgroundColor(Color.parseColor("#00000000")) // Transparente
+                    view.alpha = 1.0f
+                }
             }
 
             holder.itemView.setOnClickListener { onClick(item) }
