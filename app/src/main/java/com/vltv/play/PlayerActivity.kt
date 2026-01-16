@@ -55,6 +55,9 @@ class PlayerActivity : AppCompatActivity() {
     private var nextStreamId: Int = 0
     private var nextChannelName: String? = null
     private var startPositionMs: Long = 0L
+    
+    // NOVO: Variável para guardar a capa do filme/série
+    private var streamIcon: String = ""
 
     private var offlineUri: String? = null
 
@@ -74,7 +77,6 @@ class PlayerActivity : AppCompatActivity() {
     private val USER_AGENT = "IPTVSmartersPro"
     private val handler = Handler(Looper.getMainLooper())
     
-    // Checagem do Próximo Episódio
     private val nextChecker = object : Runnable {
         override fun run() {
             val p = player ?: return
@@ -83,15 +85,12 @@ class PlayerActivity : AppCompatActivity() {
                 val pos = p.currentPosition
                 if (dur > 0) {
                     val remaining = dur - pos
-                    // Aparece faltando 60s
                     if (remaining in 1..60_000) {
                         val seconds = (remaining / 1000L).toInt()
                         tvNextEpisodeTitle.text = "Próximo episódio em ${seconds}s"
                         
                         if (nextEpisodeContainer.visibility != View.VISIBLE) {
                             nextEpisodeContainer.visibility = View.VISIBLE
-                            
-                            // TRUQUE DE FOCO: Esconde a barra para forçar o foco no botão
                             playerView.hideController()
                             btnPlayNextEpisode.requestFocus()
                         }
@@ -140,6 +139,9 @@ class PlayerActivity : AppCompatActivity() {
         startPositionMs = intent.getLongExtra("start_position_ms", 0L)
         nextStreamId = intent.getIntExtra("next_stream_id", 0)
         nextChannelName = intent.getStringExtra("next_channel_name")
+        
+        // NOVO: Pega a imagem (ícone) para o histórico
+        streamIcon = intent.getStringExtra("stream_icon") ?: ""
 
         val listaExtra = intent.getIntegerArrayListExtra("episode_list")
         if (listaExtra != null) {
@@ -177,7 +179,6 @@ class PlayerActivity : AppCompatActivity() {
         playerView.setControllerVisibilityListener(
             PlayerView.ControllerVisibilityListener { visibility ->
                 topBar.visibility = visibility
-                // Se a barra aparecer, garante que o foco esteja no PlayerView para capturar setas
                 if (visibility == View.VISIBLE) {
                     playerView.requestFocus()
                 }
@@ -213,7 +214,6 @@ class PlayerActivity : AppCompatActivity() {
             handler.post(nextChecker)
         }
         
-        // Garante foco inicial no player para evitar cliques perdidos
         playerView.requestFocus()
     }
 
@@ -344,7 +344,6 @@ class PlayerActivity : AppCompatActivity() {
 
         val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory)
 
-        // CONFIGURAÇÃO TURBO PARA QUALIDADE MÁXIMA
         val isLive = streamType == "live"
         val minBufferMs = if (isLive) 2000 else 2000
         val maxBufferMs = if (isLive) 5000 else 15000
@@ -366,7 +365,6 @@ class PlayerActivity : AppCompatActivity() {
             .setLoadControl(loadControl)
             .build()
 
-        // Garante que o vídeo tente preencher a melhor qualidade
         player?.videoScalingMode = C.VIDEO_SCALING_MODE_SCALE_TO_FIT
         
         playerView.player = player
@@ -452,6 +450,8 @@ class PlayerActivity : AppCompatActivity() {
         intent.putExtra("stream_ext", "mp4")
         intent.putExtra("stream_type", "series")
         intent.putExtra("channel_name", novoTitulo) 
+        // PASSA O ÍCONE ADIANTE
+        intent.putExtra("stream_icon", streamIcon)
         
         if (episodeList.isNotEmpty()) {
             intent.putIntegerArrayListExtra("episode_list", episodeList)
@@ -459,6 +459,29 @@ class PlayerActivity : AppCompatActivity() {
         
         startActivity(intent)
         finish()
+    }
+
+    // --- LÓGICA DE SALVAMENTO NO HISTÓRICO ---
+    private fun salvarNoHistorico() {
+        val p = player ?: return
+        
+        // Só salva Filmes ou Séries (ignora Live TV)
+        if (streamType == "live") return
+        
+        // Só salva se assistiu pelo menos 30 segundos
+        if (p.currentPosition < 30_000) return
+
+        val item = HistoryItem(
+            id = streamId,
+            title = tvChannelName.text.toString(),
+            image = streamIcon,
+            type = streamType,
+            position = p.currentPosition,
+            duration = p.duration
+        )
+        
+        // Chama o repositório que criamos na HomeActivity
+        HistoryRepository.add(this, item)
     }
 
     private fun getMovieKey(id: Int) = "movie_resume_$id"
@@ -570,24 +593,18 @@ class PlayerActivity : AppCompatActivity() {
         })
     }
 
-    // --- CORREÇÃO DO BOTÃO OK E NAVEGAÇÃO ---
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         
-        // 1. Se botão Próximo estiver na tela, OK clica nele
         if (nextEpisodeContainer.visibility == View.VISIBLE && 
            (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER)) {
              abrirProximoEpisodio()
              return true
         }
 
-        // 2. Se a barra estiver VISÍVEL, deixa o Android controlar o foco
-        // Isso permite: Seta Baixo -> Focar Barra -> Esquerda/Direita para navegar no tempo
         if (playerView.isControllerFullyVisible) {
-            // Se apertar OK com foco na barra, ele executa a ação da barra (ou Play/Pause)
             return super.onKeyDown(keyCode, event)
         }
 
-        // 3. Se a barra estiver ESCONDIDA, OK abre a barra e Pausa
         val p = player ?: return super.onKeyDown(keyCode, event)
         return when (keyCode) {
             KeyEvent.KEYCODE_DPAD_LEFT -> {
@@ -603,15 +620,15 @@ class PlayerActivity : AppCompatActivity() {
                 true
             }
             KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
-                // MOSTRA A BARRA E PAUSA (Comportamento solicitado)
                 playerView.showController()
                 if (p.isPlaying) {
                     p.pause()
                 }
-                // Retorna true para EVITAR O ZOOM do sistema
                 true
             }
             KeyEvent.KEYCODE_BACK -> {
+                // Ao voltar, salva no histórico
+                salvarNoHistorico()
                 finish()
                 true
             }
@@ -621,6 +638,11 @@ class PlayerActivity : AppCompatActivity() {
 
     override fun onPause() {
         super.onPause()
+        
+        // SALVA NO HISTÓRICO DA HOME
+        salvarNoHistorico()
+
+        // LÓGICA ANTIGA DE RESUME
         val p = player ?: return
         if (streamType == "movie") {
             saveMovieResume(streamId, p.currentPosition, p.duration)
@@ -631,6 +653,10 @@ class PlayerActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        
+        // SALVA NO HISTÓRICO DA HOME
+        salvarNoHistorico()
+
         handler.removeCallbacks(nextChecker)
         val p = player
         if (p != null) {
