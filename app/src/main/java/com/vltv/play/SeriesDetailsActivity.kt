@@ -25,7 +25,6 @@ import okhttp3.Request
 import org.json.JSONObject
 import java.util.ArrayList
 
-// Importante: Certifique-se de que CastAdapter e CastMember estão no projeto
 import com.vltv.play.CastAdapter
 import com.vltv.play.CastMember
 
@@ -36,14 +35,13 @@ class SeriesDetailsActivity : AppCompatActivity() {
     private var seriesIcon: String? = null
     private var seriesRating: String = "0.0"
 
-    // Views
     private lateinit var imgPoster: ImageView
     private lateinit var imgBackground: ImageView
     private lateinit var tvTitle: TextView
     private lateinit var tvRating: TextView
     private lateinit var tvGenre: TextView
-    private lateinit var tvCast: TextView // Título "Elenco"
-    private lateinit var recyclerCast: RecyclerView // Lista de bolinhas (Novo)
+    private lateinit var tvCast: TextView 
+    private lateinit var recyclerCast: RecyclerView 
     private lateinit var tvPlot: TextView
     private lateinit var btnSeasonSelector: TextView
     private lateinit var rvEpisodes: RecyclerView
@@ -55,7 +53,7 @@ class SeriesDetailsActivity : AppCompatActivity() {
     private lateinit var tvDownloadEpisodeState: TextView
 
     private lateinit var btnDownloadSeason: Button
-    private lateinit var btnResume: Button // Botão Continuar
+    private lateinit var btnResume: Button 
 
     private var episodesBySeason: Map<String, List<EpisodeStream>> = emptyMap()
     private var sortedSeasons: List<String> = emptyList()
@@ -89,21 +87,18 @@ class SeriesDetailsActivity : AppCompatActivity() {
         tvCast.text = "Elenco:" 
         tvPlot.text = "Carregando sinopse..."
 
-        btnSeasonSelector.setBackgroundColor(Color.parseColor("#333333"))
-
-        // CORREÇÃO: Glide com estratégia de cache e redimensionamento para TV Box antiga
+        // CORREÇÃO: Glide Leve
         Glide.with(this)
             .load(seriesIcon)
             .placeholder(R.mipmap.ic_launcher)
             .diskCacheStrategy(DiskCacheStrategy.ALL)
-            .override(300, 450) // Reduz memória
+            .override(300, 450)
             .centerCrop()
             .into(imgPoster)
 
         rvEpisodes.isFocusable = true
         rvEpisodes.isFocusableInTouchMode = true
         rvEpisodes.setHasFixedSize(true)
-        // Ajuste de Colunas: 5 para TV ficar bonito
         rvEpisodes.layoutManager = androidx.recyclerview.widget.GridLayoutManager(this, if (isTelevisionDevice()) 5 else 4)
         
         rvEpisodes.addOnChildAttachStateChangeListener(object : RecyclerView.OnChildAttachStateChangeListener {
@@ -152,6 +147,9 @@ class SeriesDetailsActivity : AppCompatActivity() {
              val ep = currentEpisode ?: return@setOnClickListener
              abrirPlayer(ep, true)
         }
+        
+        // --- 1. APLICAÇÃO DE FOCO NOS BOTÕES DE AÇÃO ---
+        setupFocusVisuals()
 
         restaurarEstadoDownload()
         setupDownloadButtons() 
@@ -182,6 +180,50 @@ class SeriesDetailsActivity : AppCompatActivity() {
         imgDownloadEpisodeState = findViewById(R.id.imgDownloadState)
         tvDownloadEpisodeState = findViewById(R.id.tvDownloadState)
         btnDownloadSeason = findViewById(R.id.btnDownloadSeason)
+    }
+
+    // --- SETUP VISUAL PARA TV (FOCO AMARELO + BORDA) ---
+    private fun setupFocusVisuals() {
+        val btnFocus = View.OnFocusChangeListener { v, hasFocus ->
+            if (hasFocus) {
+                v.animate().scaleX(1.1f).scaleY(1.1f).setDuration(150).start()
+                if (v is TextView) v.setTextColor(Color.parseColor("#FFD700"))
+            } else {
+                v.animate().scaleX(1.0f).scaleY(1.0f).setDuration(150).start()
+                if (v is TextView) v.setTextColor(Color.WHITE)
+            }
+        }
+        
+        btnPlaySeries.onFocusChangeListener = btnFocus
+        btnResume.onFocusChangeListener = btnFocus
+        
+        // Destaque Especial para o Seletor de Temporada
+        btnSeasonSelector.isFocusable = true
+        btnSeasonSelector.setOnFocusChangeListener { v, hasFocus ->
+            if (hasFocus) {
+                v.animate().scaleX(1.1f).scaleY(1.1f).setDuration(150).start()
+                v.setBackgroundColor(Color.parseColor("#FFD700"))
+                (v as TextView).setTextColor(Color.BLACK) // Inverte cor para ler
+            } else {
+                v.animate().scaleX(1.0f).scaleY(1.0f).setDuration(150).start()
+                v.setBackgroundColor(Color.parseColor("#333333"))
+                (v as TextView).setTextColor(Color.WHITE)
+            }
+        }
+        
+        // Destaque para Favoritos
+        btnFavoriteSeries.isFocusable = true
+        btnFavoriteSeries.setOnFocusChangeListener { v, hasFocus ->
+            val isFav = getFavSeries(this).contains(seriesId)
+            if (hasFocus) {
+                v.animate().scaleX(1.2f).scaleY(1.2f).setDuration(150).start()
+                (v as ImageButton).setColorFilter(Color.parseColor("#FFD700"))
+            } else {
+                v.animate().scaleX(1.0f).scaleY(1.0f).setDuration(150).start()
+                if (isFav) (v as ImageButton).setColorFilter(Color.parseColor("#FFD700"))
+                else (v as ImageButton).clearColorFilter()
+            }
+        }
     }
 
     private fun setupDownloadButtons() {
@@ -244,11 +286,10 @@ class SeriesDetailsActivity : AppCompatActivity() {
                                 if (vote > 0) tvRating.text = "Nota: ${String.format("%.1f", vote)}"
                                 val backdropPath = show.optString("backdrop_path")
                                 if (backdropPath.isNotEmpty() && imgBackground != imgPoster) {
-                                    // CORREÇÃO: Limita tamanho da imagem de fundo para evitar tela preta
                                     Glide.with(this@SeriesDetailsActivity)
                                         .load("https://image.tmdb.org/t/p/w1280$backdropPath")
                                         .diskCacheStrategy(DiskCacheStrategy.ALL)
-                                        .override(800, 450) // Força resolução menor para TV Box antiga
+                                        .override(800, 450)
                                         .centerCrop().into(imgBackground)
                                 }
                                 Glide.with(this@SeriesDetailsActivity).load(seriesIcon).placeholder(R.mipmap.ic_launcher).centerCrop().into(imgPoster)
@@ -387,9 +428,6 @@ class SeriesDetailsActivity : AppCompatActivity() {
         }
     }
 
-    // =========================================================================
-    //  ATENÇÃO: LÓGICA DO PLAYER E BOTÃO "PRÓXIMO" REVISADA E BLINDADA
-    // =========================================================================
     private fun abrirPlayer(ep: EpisodeStream, usarResume: Boolean) {
         val streamId = ep.id.toIntOrNull() ?: 0
         val ext = ep.container_extension ?: "mp4"
@@ -397,12 +435,10 @@ class SeriesDetailsActivity : AppCompatActivity() {
         val lista = episodesBySeason[currentSeason] ?: emptyList()
         val position = lista.indexOfFirst { it.id == ep.id }
         
-        // 1. Encontra o próximo episódio para o botão "Próximo"
         val nextEp = if (position + 1 < lista.size) lista[position + 1] else null
         val nextStreamId = nextEp?.id?.toIntOrNull() ?: 0
         val nextChannelName = nextEp?.let { "T${currentSeason}E${it.episode_num} - $seriesName" }
 
-        // 2. Cria a "Mochila" (Lista Completa) para o Player
         val mochilaIds = ArrayList<Int>()
         for (item in lista) {
             val idInt = item.id.toIntOrNull() ?: 0
@@ -421,14 +457,12 @@ class SeriesDetailsActivity : AppCompatActivity() {
         intent.putExtra("stream_type", "series")
         intent.putExtra("channel_name", "T${currentSeason}E${ep.episode_num} - $seriesName")
         
-        // 3. Passa a Mochila (Isso é crucial para o botão Próximo funcionar)
         if (mochilaIds.isNotEmpty()) {
             intent.putIntegerArrayListExtra("episode_list", mochilaIds)
         }
 
         if (existe) intent.putExtra("start_position_ms", pos)
         
-        // 4. Passa os dados do próximo episódio
         if (nextStreamId != 0) {
             intent.putExtra("next_stream_id", nextStreamId)
             if (nextChannelName != null) intent.putExtra("next_channel_name", nextChannelName)
@@ -539,28 +573,47 @@ class SeriesDetailsActivity : AppCompatActivity() {
             holder.tvTitle.text = "E${ep.episode_num.toString().padStart(2, '0')} - ${ep.title}"
             
             if (holder.imgThumb != null) {
-                // CORREÇÃO: Limita tamanho da capa para não estourar memória na TV antiga
                 Glide.with(holder.itemView.context)
                     .load(ep.info?.movie_image)
                     .placeholder(android.R.drawable.ic_menu_gallery)
                     .error(android.R.color.darker_gray)
-                    .override(300, 200) // Mais leve
+                    .override(300, 200) 
                     .diskCacheStrategy(DiskCacheStrategy.ALL)
                     .centerCrop()
                     .into(holder.imgThumb)
             }
+            
             holder.itemView.setOnClickListener { onClick(ep, position) }
+            
+            // --- CORREÇÃO DE FOCO EPISÓDIO ---
+            holder.itemView.isFocusable = true
             holder.itemView.setOnFocusChangeListener { view, hasFocus ->
                 if (hasFocus) {
-                    // EFEITO DE ZOOM E COR FORTE (AMARELO OURO)
-                    view.animate().scaleX(1.08f).scaleY(1.08f).setDuration(150).start()
-                    holder.tvTitle.setTextColor(Color.parseColor("#FFD700")) // Amarelo Ouro
-                    holder.tvTitle.setBackgroundColor(Color.parseColor("#E6000000")) // Fundo mais escuro
+                    // Zoom
+                    view.animate().scaleX(1.1f).scaleY(1.1f).setDuration(150).start()
+                    
+                    // Borda Amarela
+                    try {
+                        view.setBackgroundResource(R.drawable.focus_border)
+                    } catch (e: Exception) {
+                        view.setBackgroundColor(Color.parseColor("#FFD700"))
+                        view.setPadding(3,3,3,3)
+                    }
+
+                    // Título Amarelo
+                    holder.tvTitle.setTextColor(Color.parseColor("#FFD700"))
+                    holder.tvTitle.setBackgroundColor(Color.parseColor("#E6000000"))
+                    view.elevation = 10f
                 } else {
-                    // VOLTA AO NORMAL
+                    // Normal
                     view.animate().scaleX(1.0f).scaleY(1.0f).setDuration(150).start()
+                    
+                    view.setBackgroundResource(0) // Remove borda
+                    view.setPadding(0,0,0,0)
+                    
                     holder.tvTitle.setTextColor(Color.WHITE)
                     holder.tvTitle.setBackgroundColor(Color.parseColor("#D9000000"))
+                    view.elevation = 0f
                 }
             }
         }
