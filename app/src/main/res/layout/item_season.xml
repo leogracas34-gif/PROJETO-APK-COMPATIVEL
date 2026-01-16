@@ -2,19 +2,21 @@
 <androidx.cardview.widget.CardView
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:layout_width="wrap_content"
+    android:layout_width="match_parent"
     android:layout_height="50dp"
-    android:layout_marginEnd="12dp"
+    android:layout_marginBottom="8dp"
+    android:layout_marginHorizontal="16dp"
     app:cardCornerRadius="8dp"
-    app:cardElevation="0dp"
-    app:cardBackgroundColor="#333333">
+    app:cardElevation="4dp"
+    app:cardBackgroundColor="#333333"
+    android:clickable="true"
+    android:focusable="true">
 
     <TextView
         android:id="@+id/tvSeasonName"
-        android:layout_width="wrap_content"
+        android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:gravity="center"
-        android:paddingHorizontal="16dp"
         android:text="Temporada 1"
         android:textColor="#FFFFFF"
         android:textSize="16sp"
