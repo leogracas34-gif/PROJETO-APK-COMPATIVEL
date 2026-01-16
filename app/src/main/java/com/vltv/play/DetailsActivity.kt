@@ -2,7 +2,6 @@ package com.vltv.play
 
 import android.content.Context
 import android.content.Intent
-import android.content.res.ColorStateList
 import android.graphics.Color
 import android.os.Bundle
 import android.os.Handler
@@ -124,13 +123,11 @@ class DetailsActivity : AppCompatActivity() {
             btnDownloadArea.visibility = View.GONE
         }
 
-        // Configuração inicial de foco
         btnPlay.isFocusable = true
         btnResume.isFocusable = true
         btnFavorite.isFocusable = true
         btnSettings?.isFocusable = true
         
-        // Garante que o texto comece Branco
         btnPlay.setTextColor(Color.WHITE)
         btnResume.setTextColor(Color.WHITE)
         
@@ -145,7 +142,6 @@ class DetailsActivity : AppCompatActivity() {
         tvPlot.text = "Carregando sinopse..."
         tvYear?.text = "" 
 
-        // GLIDE OTIMIZADO (TV BOX)
         Glide.with(this)
             .load(icon)
             .placeholder(android.R.drawable.ic_menu_gallery)
@@ -179,15 +175,12 @@ class DetailsActivity : AppCompatActivity() {
         val type = if (isSeries) "tv" else "movie"
         
         var cleanName = name.replace(Regex("\\(\\d{4}\\)"), "")
-        cleanName = cleanName.replace(Regex("[^A-Za-z0-9 ÁáÉéÍíÓóÚúÃãÕõÇç]"), "")
-        cleanName = cleanName.trim()
+        cleanName = cleanName.replace(Regex("[^A-Za-z0-9 ÁáÉéÍíÓóÚúÃãÕõÇç]"), "").trim()
         
         val encodedName = try { URLEncoder.encode(cleanName, "UTF-8") } catch(e:Exception) { cleanName }
         val url = "https://api.themoviedb.org/3/search/$type?api_key=$apiKey&query=$encodedName&language=pt-BR"
 
-        val request = Request.Builder().url(url).build()
-
-        client.newCall(request).enqueue(object : Callback {
+        client.newCall(Request.Builder().url(url).build()).enqueue(object : Callback {
             override fun onFailure(call: Call, e: IOException) {
                 runOnUiThread { tvPlot.text = "Falha na conexão." }
             }
@@ -265,6 +258,8 @@ class DetailsActivity : AppCompatActivity() {
             intent.putExtra("stream_id", episode.streamId)
             intent.putExtra("stream_type", "series")
             intent.putExtra("channel_name", "${name} - S${episode.season}:E${episode.episode}")
+            // MANDA O ÍCONE TAMBÉM NO EPISÓDIO
+            intent.putExtra("stream_icon", episode.thumb)
             startActivity(intent)
         }
         recyclerEpisodes.apply {
@@ -275,6 +270,7 @@ class DetailsActivity : AppCompatActivity() {
     }
 
     private fun carregarEpisodios() {
+        // Exemplo estático ou lógica real aqui
         episodes = listOf(EpisodeData(101, 1, 1, "Episódio 1", icon ?: ""))
         episodesAdapter.submitList(episodes)
         tvEpisodesTitle.visibility = View.VISIBLE
@@ -282,14 +278,15 @@ class DetailsActivity : AppCompatActivity() {
     }
 
     private fun setupEventos() {
-        // --- CORREÇÃO DO BOTÃO ASSISTIR SUMINDO ---
+        // --- CORREÇÃO DO BOTÃO "ASSISTIR" (TEXTO PRETO NO FOCO) ---
         val btnFocus = View.OnFocusChangeListener { v, hasFocus ->
             if (hasFocus) {
                 v.animate().scaleX(1.1f).scaleY(1.1f).setDuration(150).start()
-                if (v is Button) v.setTextColor(Color.parseColor("#FFD700"))
+                // SE O FUNDO FICA BRANCO, O TEXTO TEM QUE SER PRETO PARA APARECER
+                if (v is Button) v.setTextColor(Color.BLACK) 
             } else {
                 v.animate().scaleX(1.0f).scaleY(1.0f).setDuration(150).start()
-                // FORÇA A COR BRANCA AO SAIR DO FOCO PARA NÃO SUMIR
+                // SE O FUNDO É ESCURO/TRANSPARENTE, O TEXTO VOLTA A SER BRANCO
                 if (v is Button) v.setTextColor(Color.WHITE)
             }
         }
@@ -298,16 +295,13 @@ class DetailsActivity : AppCompatActivity() {
         btnResume.onFocusChangeListener = btnFocus
         btnSettings?.onFocusChangeListener = btnFocus
 
-        // --- LÓGICA ESPECIAL PARA FAVORITOS ---
         btnFavorite.setOnFocusChangeListener { v, hasFocus ->
             val isFav = getFavMovies(this).contains(streamId)
             if (hasFocus) {
                 v.animate().scaleX(1.1f).scaleY(1.1f).setDuration(150).start()
-                // Se estiver focado, fica amarelo independente de ser favorito ou não
                 (v as ImageButton).setColorFilter(Color.parseColor("#FFD700"))
             } else {
                 v.animate().scaleX(1.0f).scaleY(1.0f).setDuration(150).start()
-                // Ao perder foco: se for favorito, mantém amarelo. Se não, tira a cor.
                 if (isFav) {
                     (v as ImageButton).setColorFilter(Color.parseColor("#FFD700"))
                 } else {
@@ -361,7 +355,11 @@ class DetailsActivity : AppCompatActivity() {
 
     private fun verificarResume() {
         val prefs = getSharedPreferences("vltv_prefs", Context.MODE_PRIVATE)
-        val pos = prefs.getLong("movie_resume_${streamId}_pos", 0L)
+        // CORREÇÃO: Verifica se é filme ou série para buscar a chave certa
+        val key = if (isSeries) "series_resume_${streamId}_pos" else "movie_resume_${streamId}_pos"
+        val pos = prefs.getLong(key, 0L)
+        
+        // Se já assistiu mais de 30seg, mostra o botão "Continuar"
         btnResume.visibility = if (pos > 30000L) View.VISIBLE else View.GONE
     }
 
@@ -370,8 +368,13 @@ class DetailsActivity : AppCompatActivity() {
         intent.putExtra("stream_id", streamId)
         intent.putExtra("stream_type", if (isSeries) "series" else "movie")
         intent.putExtra("channel_name", name)
+        
+        // CORREÇÃO CRÍTICA: ENVIA O ÍCONE PARA SALVAR NO HISTÓRICO DA HOME
+        intent.putExtra("stream_icon", icon ?: "")
+
         if (usarResume) {
-            val pos = getSharedPreferences("vltv_prefs", Context.MODE_PRIVATE).getLong("movie_resume_${streamId}_pos", 0L)
+            val key = if (isSeries) "series_resume_${streamId}_pos" else "movie_resume_${streamId}_pos"
+            val pos = getSharedPreferences("vltv_prefs", Context.MODE_PRIVATE).getLong(key, 0L)
             intent.putExtra("start_position_ms", pos)
         }
         startActivity(intent)
@@ -416,7 +419,6 @@ class DetailsActivity : AppCompatActivity() {
 
     private fun isTelevisionDevice() = packageManager.hasSystemFeature("android.software.leanback") || packageManager.hasSystemFeature("android.hardware.type.television")
 
-    // --- ADAPTER DE EPISÓDIOS COM BORDA AMARELA E ZOOM ---
     inner class EpisodesAdapter(private val onEpisodeClick: (EpisodeData) -> Unit) : ListAdapter<EpisodeData, EpisodesAdapter.ViewHolder>(DiffCallback) {
         override fun onCreateViewHolder(p: ViewGroup, t: Int) = ViewHolder(LayoutInflater.from(p.context).inflate(R.layout.item_episode, p, false))
         override fun onBindViewHolder(h: ViewHolder, p: Int) = h.bind(getItem(p))
@@ -424,29 +426,20 @@ class DetailsActivity : AppCompatActivity() {
         inner class ViewHolder(val v: View) : RecyclerView.ViewHolder(v) {
             fun bind(e: EpisodeData) {
                 v.isFocusable = true
-                
-                // LÓGICA DE FOCO EPISÓDIO
                 v.setOnFocusChangeListener { view, hasFocus ->
                     if (hasFocus) {
                         view.animate().scaleX(1.1f).scaleY(1.1f).setDuration(150).start()
-                        
-                        // Aplica a borda amarela (via código ou drawable)
                         try {
                             view.setBackgroundResource(R.drawable.focus_border)
                         } catch (ex: Exception) {
                             view.setBackgroundColor(Color.parseColor("#FFD700"))
                             view.setPadding(3,3,3,3)
                         }
-                        
-                        // Destaque no título
                         v.findViewById<TextView>(R.id.tvEpisodeTitle).setTextColor(Color.parseColor("#FFD700"))
-                        
                     } else {
                         view.animate().scaleX(1.0f).scaleY(1.0f).setDuration(150).start()
-                        
                         view.setBackgroundResource(0)
                         view.setPadding(0,0,0,0)
-                        
                         v.findViewById<TextView>(R.id.tvEpisodeTitle).setTextColor(Color.WHITE)
                     }
                 }
