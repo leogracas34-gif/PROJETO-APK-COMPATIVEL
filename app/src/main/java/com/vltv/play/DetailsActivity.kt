@@ -2,13 +2,11 @@ package com.vltv.play
 
 import android.content.Context
 import android.content.Intent
-import android.content.SharedPreferences
-import android.content.res.Configuration
+import android.content.res.ColorStateList
 import android.graphics.Color
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.util.Log
 import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.View
@@ -16,6 +14,9 @@ import android.view.ViewGroup
 import android.widget.*
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -23,16 +24,10 @@ import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.engine.DiskCacheStrategy
-import com.bumptech.glide.load.resource.bitmap.CenterCrop
-import androidx.core.view.WindowCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.WindowInsetsControllerCompat
 import okhttp3.*
 import org.json.JSONObject
 import java.io.IOException
 import java.net.URLEncoder
-import com.vltv.play.CastMember
-import com.vltv.play.CastAdapter
 
 data class EpisodeData(
     val streamId: Int,
@@ -50,7 +45,6 @@ class DetailsActivity : AppCompatActivity() {
     private var rating: String = "0.0"
     private var isSeries: Boolean = false
     private var episodes: List<EpisodeData> = emptyList()
-    private var hasResumePosition: Boolean = false
 
     private lateinit var imgPoster: ImageView
     private lateinit var tvTitle: TextView
@@ -94,7 +88,6 @@ class DetailsActivity : AppCompatActivity() {
         setupEventos()
         setupEpisodesRecycler()
 
-        // Inicia a busca
         sincronizarDadosTMDB()
     }
 
@@ -131,11 +124,16 @@ class DetailsActivity : AppCompatActivity() {
             btnDownloadArea.visibility = View.GONE
         }
 
-        // --- Configuração de Foco para TV ---
+        // Configuração inicial de foco
         btnPlay.isFocusable = true
         btnResume.isFocusable = true
         btnFavorite.isFocusable = true
         btnSettings?.isFocusable = true
+        
+        // Garante que o texto comece Branco
+        btnPlay.setTextColor(Color.WHITE)
+        btnResume.setTextColor(Color.WHITE)
+        
         btnPlay.requestFocus()
     }
 
@@ -147,19 +145,18 @@ class DetailsActivity : AppCompatActivity() {
         tvPlot.text = "Carregando sinopse..."
         tvYear?.text = "" 
 
-        // 1. CORREÇÃO CAPA (POSTER): Leve e Rápido
+        // GLIDE OTIMIZADO (TV BOX)
         Glide.with(this)
             .load(icon)
             .placeholder(android.R.drawable.ic_menu_gallery)
             .diskCacheStrategy(DiskCacheStrategy.ALL)
-            .override(300, 450) // Tamanho ideal para poster lateral
+            .override(300, 450)
             .into(imgPoster)
 
-        // 2. CORREÇÃO FUNDO (BACKDROP): HD Leve para não travar o vídeo
         Glide.with(this)
             .load(icon)
             .diskCacheStrategy(DiskCacheStrategy.ALL)
-            .override(1280, 720) // Essencial para TV Box antiga
+            .override(1280, 720)
             .centerCrop()
             .into(imgBackground)
 
@@ -200,11 +197,7 @@ class DetailsActivity : AppCompatActivity() {
                 if (body != null) {
                     try {
                         val jsonObject = JSONObject(body)
-                        if (jsonObject.has("status_message")) {
-                             val msg = jsonObject.optString("status_message")
-                             runOnUiThread { tvPlot.text = "Erro API: $msg" }
-                             return
-                        }
+                        if (jsonObject.has("status_message")) return
 
                         val results = jsonObject.optJSONArray("results")
                         if (results != null && results.length() > 0) {
@@ -220,8 +213,6 @@ class DetailsActivity : AppCompatActivity() {
                                 val vote = movie.optDouble("vote_average", 0.0)
                                 if (vote > 0) tvRating.text = "⭐ ${String.format("%.1f", vote)}"
                             }
-                        } else {
-                            runOnUiThread { tvPlot.text = "Informações não encontradas." }
                         }
                     } catch (e: Exception) { e.printStackTrace() }
                 }
@@ -261,7 +252,6 @@ class DetailsActivity : AppCompatActivity() {
                                 adapter = CastAdapter(castMemberList)
                             }
                         }
-                        
                     } catch (e: Exception) { e.printStackTrace() }
                 }
             }
@@ -280,7 +270,6 @@ class DetailsActivity : AppCompatActivity() {
         recyclerEpisodes.apply {
             layoutManager = if (isTelevisionDevice()) GridLayoutManager(this@DetailsActivity, 6) else LinearLayoutManager(this@DetailsActivity, LinearLayoutManager.HORIZONTAL, false)
             adapter = episodesAdapter
-            // Crucial para navegar na lista de episódios
             descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
         }
     }
@@ -293,25 +282,39 @@ class DetailsActivity : AppCompatActivity() {
     }
 
     private fun setupEventos() {
-        // --- 3. CORREÇÃO DE FOCO (Amarelo Ouro + Zoom) ---
-        val zoomFocus = View.OnFocusChangeListener { v, hasFocus ->
+        // --- CORREÇÃO DO BOTÃO ASSISTIR SUMINDO ---
+        val btnFocus = View.OnFocusChangeListener { v, hasFocus ->
             if (hasFocus) {
                 v.animate().scaleX(1.1f).scaleY(1.1f).setDuration(150).start()
-                if (v is Button) {
-                    v.setTextColor(Color.parseColor("#FFD700")) // Amarelo
-                }
+                if (v is Button) v.setTextColor(Color.parseColor("#FFD700"))
             } else {
                 v.animate().scaleX(1.0f).scaleY(1.0f).setDuration(150).start()
-                if (v is Button) {
-                    v.setTextColor(Color.WHITE) // Volta ao normal
-                }
+                // FORÇA A COR BRANCA AO SAIR DO FOCO PARA NÃO SUMIR
+                if (v is Button) v.setTextColor(Color.WHITE)
             }
         }
         
-        btnPlay.onFocusChangeListener = zoomFocus
-        btnResume.onFocusChangeListener = zoomFocus
-        btnFavorite.onFocusChangeListener = zoomFocus
-        btnSettings?.onFocusChangeListener = zoomFocus
+        btnPlay.onFocusChangeListener = btnFocus
+        btnResume.onFocusChangeListener = btnFocus
+        btnSettings?.onFocusChangeListener = btnFocus
+
+        // --- LÓGICA ESPECIAL PARA FAVORITOS ---
+        btnFavorite.setOnFocusChangeListener { v, hasFocus ->
+            val isFav = getFavMovies(this).contains(streamId)
+            if (hasFocus) {
+                v.animate().scaleX(1.1f).scaleY(1.1f).setDuration(150).start()
+                // Se estiver focado, fica amarelo independente de ser favorito ou não
+                (v as ImageButton).setColorFilter(Color.parseColor("#FFD700"))
+            } else {
+                v.animate().scaleX(1.0f).scaleY(1.0f).setDuration(150).start()
+                // Ao perder foco: se for favorito, mantém amarelo. Se não, tira a cor.
+                if (isFav) {
+                    (v as ImageButton).setColorFilter(Color.parseColor("#FFD700"))
+                } else {
+                    (v as ImageButton).clearColorFilter()
+                }
+            }
+        }
 
         btnFavorite.setOnClickListener { toggleFavorite() }
         btnPlay.setOnClickListener { abrirPlayer(false) }
@@ -413,26 +416,47 @@ class DetailsActivity : AppCompatActivity() {
 
     private fun isTelevisionDevice() = packageManager.hasSystemFeature("android.software.leanback") || packageManager.hasSystemFeature("android.hardware.type.television")
 
+    // --- ADAPTER DE EPISÓDIOS COM BORDA AMARELA E ZOOM ---
     inner class EpisodesAdapter(private val onEpisodeClick: (EpisodeData) -> Unit) : ListAdapter<EpisodeData, EpisodesAdapter.ViewHolder>(DiffCallback) {
         override fun onCreateViewHolder(p: ViewGroup, t: Int) = ViewHolder(LayoutInflater.from(p.context).inflate(R.layout.item_episode, p, false))
         override fun onBindViewHolder(h: ViewHolder, p: Int) = h.bind(getItem(p))
         
         inner class ViewHolder(val v: View) : RecyclerView.ViewHolder(v) {
             fun bind(e: EpisodeData) {
-                // Foco e Zoom nos episódios
                 v.isFocusable = true
-                v.setOnFocusChangeListener { _, hasFocus ->
-                    v.scaleX = if (hasFocus) 1.1f else 1.0f
-                    v.scaleY = if (hasFocus) 1.1f else 1.0f
+                
+                // LÓGICA DE FOCO EPISÓDIO
+                v.setOnFocusChangeListener { view, hasFocus ->
+                    if (hasFocus) {
+                        view.animate().scaleX(1.1f).scaleY(1.1f).setDuration(150).start()
+                        
+                        // Aplica a borda amarela (via código ou drawable)
+                        try {
+                            view.setBackgroundResource(R.drawable.focus_border)
+                        } catch (ex: Exception) {
+                            view.setBackgroundColor(Color.parseColor("#FFD700"))
+                            view.setPadding(3,3,3,3)
+                        }
+                        
+                        // Destaque no título
+                        v.findViewById<TextView>(R.id.tvEpisodeTitle).setTextColor(Color.parseColor("#FFD700"))
+                        
+                    } else {
+                        view.animate().scaleX(1.0f).scaleY(1.0f).setDuration(150).start()
+                        
+                        view.setBackgroundResource(0)
+                        view.setPadding(0,0,0,0)
+                        
+                        v.findViewById<TextView>(R.id.tvEpisodeTitle).setTextColor(Color.WHITE)
+                    }
                 }
                 
                 v.findViewById<TextView>(R.id.tvEpisodeTitle).text = "S${e.season}E${e.episode}: ${e.title}"
                 
-                // Glide leve também para episódios
                 Glide.with(v.context)
                     .load(e.thumb)
                     .diskCacheStrategy(DiskCacheStrategy.ALL)
-                    .override(250, 150) // Thumb leve
+                    .override(250, 150)
                     .centerCrop()
                     .into(v.findViewById(R.id.imgEpisodeThumb))
                     
