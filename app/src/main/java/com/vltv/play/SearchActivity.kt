@@ -1,12 +1,15 @@
-Package com.vltv.play
+package com.vltv.play
 
+import android.content.Context
 import android.content.Intent
+import android.graphics.Color
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
 import android.widget.ImageButton
 import android.widget.ProgressBar
@@ -63,6 +66,28 @@ class SearchActivity : AppCompatActivity(), CoroutineScope {
         rvResults = findViewById(R.id.rvResults)
         progressBar = findViewById(R.id.progressBar)
         tvEmpty = findViewById(R.id.tvEmpty)
+
+        // --- AJUSTE DE FOCO E TECLADO ---
+        etQuery.isFocusable = true
+        etQuery.isFocusableInTouchMode = true
+        
+        etQuery.setOnFocusChangeListener { v, hasFocus ->
+            if (hasFocus) {
+                etQuery.setTextColor(Color.parseColor("#FFD700"))
+                etQuery.setHintTextColor(Color.parseColor("#CCFFD700"))
+                showKeyboard(etQuery)
+            } else {
+                etQuery.setTextColor(Color.WHITE)
+                etQuery.setHintTextColor(Color.GRAY)
+            }
+        }
+
+        etQuery.setOnClickListener { showKeyboard(etQuery) }
+    }
+
+    private fun showKeyboard(view: View) {
+        val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+        imm.showSoftInput(view, InputMethodManager.SHOW_IMPLICIT)
     }
 
     private fun setupRecyclerView() {
@@ -100,11 +125,15 @@ class SearchActivity : AppCompatActivity(), CoroutineScope {
         // Botão de busca (teclado ou icone) força o filtro
         btnDoSearch.setOnClickListener { 
             filtrarNaMemoria(etQuery.text.toString().trim()) 
+            showKeyboard(etQuery)
         }
 
         etQuery.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_SEARCH) {
                 filtrarNaMemoria(etQuery.text.toString().trim())
+                // Esconde teclado ao confirmar
+                val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+                imm.hideSoftInputFromWindow(etQuery.windowToken, 0)
                 true
             } else false
         }
@@ -116,7 +145,7 @@ class SearchActivity : AppCompatActivity(), CoroutineScope {
         progressBar.visibility = View.VISIBLE
         tvEmpty.text = "Carregando catálogo completo..."
         tvEmpty.visibility = View.VISIBLE
-        etQuery.isEnabled = false // Trava a busca enquanto carrega
+        // etQuery.isEnabled = false // Comentado para não perder foco na TV durante o load
 
         val prefs = getSharedPreferences("vltv_prefs", MODE_PRIVATE)
         val username = prefs.getString("username", "") ?: ""
@@ -235,8 +264,6 @@ class SearchActivity : AppCompatActivity(), CoroutineScope {
 
     private fun buscarCanais(u: String, p: String): List<SearchResultItem> {
         return try {
-            // categoryId="0" ou similar para pegar todos, depende da sua API. 
-            // Se "0" falhar, tente sem categoryId ou implemente lógica de pegar categorias primeiro.
             val response = XtreamApi.service.getLiveStreams(u, p, categoryId = "0").execute()
             if (response.isSuccessful && response.body() != null) {
                 response.body()!!.map {
@@ -245,7 +272,7 @@ class SearchActivity : AppCompatActivity(), CoroutineScope {
                         title = it.name ?: "Sem Nome",
                         type = "live",
                         extraInfo = null,
-                        iconUrl = it.icon // Verifique se na sua API é 'icon' ou 'stream_icon'
+                        iconUrl = it.icon 
                     )
                 }
             } else emptyList()
