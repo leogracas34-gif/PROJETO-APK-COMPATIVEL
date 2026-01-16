@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="#000000">
@@ -10,7 +11,7 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:scaleType="centerCrop"
-        android:alpha="0.7"
+        android:alpha="0.4"
         android:visibility="visible" />
 
     <View
@@ -41,8 +42,7 @@
                     android:scaleType="centerCrop"
                     android:background="#333333"
                     android:elevation="8dp"
-                    android:focusable="true"
-                    android:focusableInTouchMode="false" />
+                    android:focusable="true" />
 
                 <LinearLayout
                     android:layout_width="0dp"
@@ -57,7 +57,7 @@
                         android:layout_height="wrap_content"
                         android:text="Carregando..."
                         android:textColor="#FFFFFF"
-                        android:textSize="24sp"
+                        android:textSize="28sp"
                         android:textStyle="bold" />
 
                     <LinearLayout
@@ -84,7 +84,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginStart="12dp"
-                            android:text="2024"
+                            android:text=""
                             android:textColor="#BBBBBB"
                             android:textSize="14sp" />
                     </LinearLayout>
@@ -113,9 +113,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="10dp"
                         android:layout_marginBottom="10dp"
-                        android:orientation="horizontal"
-                        android:scrollbars="none"
-                        app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager" />
+                        android:orientation="horizontal" />
 
                     <TextView
                         android:layout_width="match_parent"
@@ -137,7 +135,6 @@
                         android:textSize="15sp"
                         android:maxLines="5"
                         android:ellipsize="end" />
-
                 </LinearLayout>
             </LinearLayout>
 
@@ -145,13 +142,13 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:layout_marginTop="20dp">
+                android:layout_marginTop="24dp">
 
                 <androidx.appcompat.widget.AppCompatButton
                     android:id="@+id/btnResume"
-                    android:layout_width="180dp"
+                    android:layout_width="200dp"
                     android:layout_height="50dp"
-                    android:layout_marginBottom="10dp"
+                    android:layout_marginBottom="12dp"
                     android:background="@drawable/bg_btn_grey"
                     android:text="CONTINUAR"
                     android:textColor="#FFFFFF"
@@ -168,7 +165,7 @@
 
                     <androidx.appcompat.widget.AppCompatButton
                         android:id="@+id/btnPlay"
-                        android:layout_width="180dp"
+                        android:layout_width="200dp"
                         android:layout_height="50dp"
                         android:background="@drawable/bg_btn_white"
                         android:text="ASSISTIR"
@@ -181,40 +178,12 @@
                         android:id="@+id/btnFavorite"
                         android:layout_width="50dp"
                         android:layout_height="50dp"
-                        android:layout_marginStart="15dp"
+                        android:layout_marginStart="20dp"
                         android:src="@android:drawable/btn_star_big_off"
                         android:background="?attr/selectableItemBackgroundBorderless"
                         android:focusable="true"
                         app:tint="#FFFFFF" />
                 </LinearLayout>
-            </LinearLayout>
-
-            <LinearLayout
-                android:id="@+id/btnDownloadArea"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:background="#333333"
-                android:padding="12dp"
-                android:visibility="gone">
-
-                <ImageView
-                    android:id="@+id/imgDownloadState"
-                    android:layout_width="24dp"
-                    android:layout_height="24dp"
-                    android:src="@android:drawable/stat_sys_download"
-                    android:layout_marginEnd="8dp"
-                    app:tint="#FFFFFF" />
-
-                <TextView
-                    android:id="@+id/tvDownloadState"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Baixar"
-                    android:textColor="#FFFFFF"
-                    android:textSize="16sp" />
             </LinearLayout>
 
             <TextView
