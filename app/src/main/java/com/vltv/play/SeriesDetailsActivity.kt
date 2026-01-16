@@ -352,14 +352,19 @@ class SeriesDetailsActivity : AppCompatActivity() {
             })
     }
 
+    // ==========================================================
+    // MUDANÇA PRINCIPAL: ABRIR O BOTTOM SHEET ESTILO DISNEY
+    // ==========================================================
     private fun mostrarSeletorDeTemporada() {
         if (sortedSeasons.isEmpty()) return
-        val nomes = sortedSeasons.map { "Temporada $it" }.toTypedArray()
-        AlertDialog.Builder(this)
-            .setTitle("Escolha a Temporada")
-            .setItems(nomes) { _, which -> mudarTemporada(sortedSeasons[which]) }
-            .show()
+        
+        // Em vez de AlertDialog, chamamos o nosso novo Menu Transparente
+        val sheet = SeasonBottomSheet(sortedSeasons) { selectedSeason ->
+            mudarTemporada(selectedSeason)
+        }
+        sheet.show(supportFragmentManager, "SeasonSheet")
     }
+    // ==========================================================
 
     private fun mudarTemporada(seasonKey: String) {
         currentSeason = seasonKey
