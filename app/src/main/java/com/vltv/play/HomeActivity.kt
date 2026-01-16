@@ -6,35 +6,46 @@ import android.content.res.Configuration
 import android.graphics.Color
 import android.os.Bundle
 import android.view.KeyEvent
+import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
-import android.widget.FrameLayout
-import android.widget.LinearLayout
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.core.view.updateLayoutParams
-import androidx.core.view.updateMargins
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.engine.DiskCacheStrategy
 import com.vltv.play.databinding.ActivityHomeBinding
-import com.vltv.play.DownloadHelper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
 import org.json.JSONObject
 import java.net.URL
 import kotlin.random.Random
+
+// --- MODELO DE DADOS PARA O HISTÓRICO ---
+data class HistoryItem(
+    val id: Int,
+    val title: String,
+    val image: String,
+    val type: String, // "movie" ou "series"
+    val position: Long,
+    val duration: Long
+)
 
 class HomeActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityHomeBinding
     private val TMDB_API_KEY = "9b73f5dd15b8165b1b57419be2f29128"
+    private lateinit var historyAdapter: ContinueWatchingAdapter
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -48,6 +59,7 @@ class HomeActivity : AppCompatActivity() {
         DownloadHelper.registerReceiver(this)
 
         setupClicks()
+        setupContinueWatchingRecycler()
         
         // Aplica o espaçamento extra para TV
         if (isTelevisionDevice()) {
@@ -58,6 +70,7 @@ class HomeActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         carregarBannerAlternado()
+        carregarHistorico() // Atualiza a lista de continuar assistindo
 
         try {
             binding.etSearch.setText("")
@@ -68,10 +81,57 @@ class HomeActivity : AppCompatActivity() {
         } catch (e: Exception) { e.printStackTrace() }
     }
 
-    // --- CORREÇÃO DE LAYOUT PARA TV ---
+    // --- CONFIGURAÇÃO DA LISTA "CONTINUAR ASSISTINDO" ---
+    private fun setupContinueWatchingRecycler() {
+        historyAdapter = ContinueWatchingAdapter { item ->
+            // Ao clicar no item do histórico, abre direto
+            abrirItemHistorico(item)
+        }
+        
+        binding.rvContinueWatching.apply {
+            layoutManager = LinearLayoutManager(this@HomeActivity, LinearLayoutManager.HORIZONTAL, false)
+            adapter = historyAdapter
+            setHasFixedSize(true)
+            // Importante para o foco não ficar preso
+            descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
+        }
+    }
+
+    private fun carregarHistorico() {
+        // Carrega do "Banco" (SharedPreferences)
+        val lista = HistoryRepository.getHistory(this)
+        
+        if (lista.isNotEmpty()) {
+            binding.tvContinueTitle.visibility = View.VISIBLE
+            binding.rvContinueWatching.visibility = View.VISIBLE
+            historyAdapter.submitList(lista)
+            
+            // Ajusta o foco do Banner para descer para a lista
+            binding.cardBanner.nextFocusDownId = R.id.rvContinueWatching
+        } else {
+            // Se vazio, esconde tudo para não poluir
+            binding.tvContinueTitle.visibility = View.GONE
+            binding.rvContinueWatching.visibility = View.GONE
+            
+            // Ajusta o foco do Banner para pular direto para os botões principais
+            binding.cardBanner.nextFocusDownId = R.id.cardMovies
+        }
+    }
+
+    private fun abrirItemHistorico(item: HistoryItem) {
+        val intent = Intent(this, PlayerActivity::class.java)
+        intent.putExtra("stream_id", item.id)
+        intent.putExtra("stream_type", item.type)
+        intent.putExtra("channel_name", item.title)
+        intent.putExtra("start_position_ms", item.position) // Já começa de onde parou
+        startActivity(intent)
+    }
+
+    // --- CORREÇÃO DE LAYOUT PARA TV (BOTÕES MENORES E SEPARADOS) ---
     private fun ajustarLayoutTV() {
-        // Reduz um pouco o tamanho dos cards para não ficarem gigantes na TV 55"
         val scaleFactor = 0.9f 
+        
+        // Reduz tamanho visual
         binding.cardLiveTv.scaleX = scaleFactor
         binding.cardLiveTv.scaleY = scaleFactor
         binding.cardMovies.scaleX = scaleFactor
@@ -79,20 +139,15 @@ class HomeActivity : AppCompatActivity() {
         binding.cardSeries.scaleX = scaleFactor
         binding.cardSeries.scaleY = scaleFactor
 
-        // Adiciona margem entre os cartões para não colarem
-        // Tenta ajustar layout params (depende do container pai ser LinearLayout ou ConstraintLayout)
+        // Tenta adicionar margens extras via código para garantir separação
         try {
-            val marginPx = 24 // Espaço generoso entre os botões
-            
-            // Verifica o tipo de LayoutParams antes de castar
+            val marginPx = 24 
             if (binding.cardMovies.layoutParams is ViewGroup.MarginLayoutParams) {
                 binding.cardMovies.updateLayoutParams<ViewGroup.MarginLayoutParams> {
                     setMargins(marginPx, topMargin, marginPx, bottomMargin)
                 }
             }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+        } catch (e: Exception) { e.printStackTrace() }
     }
 
     private fun isTelevisionDevice(): Boolean {
@@ -133,13 +188,9 @@ class HomeActivity : AppCompatActivity() {
             card.isFocusable = true
             card.isClickable = true
             
-            // EFEITO DE FOCO ESPECIAL (Zoom + Borda Amarela)
             card.setOnFocusChangeListener { view, hasFocus ->
                 if (hasFocus) {
-                    // Zoom mais forte para destacar bem
                     view.animate().scaleX(1.1f).scaleY(1.1f).setDuration(200).start()
-                    
-                    // Borda Amarela
                     try {
                         view.setBackgroundResource(R.drawable.focus_border)
                     } catch (e: Exception) {
@@ -148,10 +199,8 @@ class HomeActivity : AppCompatActivity() {
                     }
                     view.elevation = 20f
                 } else {
-                    // Volta ao tamanho reduzido padrão da TV (0.9f) ou normal (1.0f)
                     val normalScale = if (isTelevisionDevice()) 0.9f else 1.0f
                     view.animate().scaleX(normalScale).scaleY(normalScale).setDuration(200).start()
-                    
                     view.setBackgroundResource(0)
                     view.setPadding(0,0,0,0)
                     view.elevation = 0f
@@ -175,7 +224,6 @@ class HomeActivity : AppCompatActivity() {
                     true
                 } else false
             }
-            
             binding.cardMovies.setOnKeyListener { _, keyCode, event ->
                 if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT && event.action == KeyEvent.ACTION_DOWN) {
                     binding.cardLiveTv.requestFocus()
@@ -185,7 +233,6 @@ class HomeActivity : AppCompatActivity() {
                     true
                 } else false
             }
-            
             binding.cardSeries.setOnKeyListener { _, keyCode, event ->
                 if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT && event.action == KeyEvent.ACTION_DOWN) {
                     binding.cardMovies.requestFocus()
@@ -230,7 +277,6 @@ class HomeActivity : AppCompatActivity() {
             .setPositiveButton("Sim") { _, _ ->
                 val prefs = getSharedPreferences("vltv_prefs", Context.MODE_PRIVATE)
                 prefs.edit().clear().apply()
-
                 val intent = Intent(this, LoginActivity::class.java)
                 intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
                 startActivity(intent)
@@ -265,11 +311,9 @@ class HomeActivity : AppCompatActivity() {
 
                     if (backdropPath != "null" && backdropPath.isNotBlank()) {
                         val imageUrl = "https://image.tmdb.org/t/p/w1280$backdropPath"
-
                         withContext(Dispatchers.Main) {
                             binding.tvBannerTitle.text = "$prefixo$titulo"
                             binding.tvBannerOverview.text = overview
-
                             Glide.with(this@HomeActivity)
                                 .load(imageUrl)
                                 .diskCacheStrategy(DiskCacheStrategy.ALL)
@@ -290,5 +334,124 @@ class HomeActivity : AppCompatActivity() {
             return true
         }
         return super.onKeyDown(keyCode, event)
+    }
+
+    // --- ADAPTER INTERNO PARA O HISTÓRICO ---
+    inner class ContinueWatchingAdapter(private val onClick: (HistoryItem) -> Unit) : 
+        RecyclerView.Adapter<ContinueWatchingAdapter.VH>() {
+        
+        private var items = listOf<HistoryItem>()
+
+        fun submitList(newItems: List<HistoryItem>) {
+            items = newItems
+            notifyDataSetChanged()
+        }
+
+        inner class VH(v: View) : RecyclerView.ViewHolder(v) {
+            val imgPoster: android.widget.ImageView = v.findViewById(R.id.imgPoster)
+            val progressBar: android.widget.ProgressBar = v.findViewById(R.id.progressBar) // Opcional se tiver no layout
+        }
+
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
+            // Usa o mesmo layout de VOD pois é compatível (capa vertical)
+            val v = LayoutInflater.from(parent.context).inflate(R.layout.item_vod, parent, false)
+            // Ajusta tamanho para ficar menor e elegante (horizontal strip)
+            v.layoutParams = ViewGroup.MarginLayoutParams(240, 360).apply {
+                setMargins(0, 0, 24, 0)
+            }
+            return VH(v)
+        }
+
+        override fun onBindViewHolder(holder: VH, position: Int) {
+            val item = items[position]
+            
+            // Tira o texto do layout reaproveitado, deixa só a imagem
+            holder.itemView.findViewById<android.widget.TextView>(R.id.tvName)?.visibility = View.GONE
+            
+            Glide.with(holder.itemView.context)
+                .load(item.image)
+                .override(240, 360)
+                .centerCrop()
+                .into(holder.imgPoster)
+
+            holder.itemView.isFocusable = true
+            holder.itemView.isClickable = true
+            
+            // Foco: Borda Amarela + Zoom
+            holder.itemView.setOnFocusChangeListener { view, hasFocus ->
+                if (hasFocus) {
+                    view.animate().scaleX(1.1f).scaleY(1.1f).setDuration(150).start()
+                    try {
+                        view.setBackgroundResource(R.drawable.focus_border)
+                    } catch (e: Exception) {
+                        view.setBackgroundColor(Color.parseColor("#FFD700"))
+                        view.setPadding(4,4,4,4)
+                    }
+                    view.elevation = 10f
+                } else {
+                    view.animate().scaleX(1.0f).scaleY(1.0f).setDuration(150).start()
+                    view.setBackgroundResource(0)
+                    view.setPadding(0,0,0,0)
+                    view.elevation = 0f
+                }
+            }
+
+            holder.itemView.setOnClickListener { onClick(item) }
+        }
+
+        override fun getItemCount() = items.size
+    }
+}
+
+// --- REPOSITÓRIO ESTÁTICO DE HISTÓRICO ---
+// Use HistoryRepository.add(context, item) em PlayerActivity/DetailsActivity para salvar
+object HistoryRepository {
+    private const val PREF_NAME = "vltv_history"
+    private const val KEY_HISTORY = "watch_history_list"
+
+    fun getHistory(context: Context): List<HistoryItem> {
+        val prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+        val jsonString = prefs.getString(KEY_HISTORY, null) ?: return emptyList()
+        val list = mutableListOf<HistoryItem>()
+        try {
+            val array = JSONArray(jsonString)
+            for (i in 0 until array.length()) {
+                val obj = array.getJSONObject(i)
+                list.add(HistoryItem(
+                    id = obj.getInt("id"),
+                    title = obj.getString("title"),
+                    image = obj.getString("image"),
+                    type = obj.getString("type"),
+                    position = obj.getLong("pos"),
+                    duration = obj.optLong("dur", 0)
+                ))
+            }
+        } catch (e: Exception) { e.printStackTrace() }
+        return list.reversed() // Mostra os mais recentes primeiro
+    }
+
+    fun add(context: Context, item: HistoryItem) {
+        val list = getHistory(context).toMutableList()
+        // Remove duplicado se já existir (para atualizar posição e mover pro topo)
+        list.removeAll { it.id == item.id && it.type == item.type }
+        list.add(item)
+        
+        // Limita a 20 itens
+        if (list.size > 20) list.removeAt(0)
+
+        val jsonArray = JSONArray()
+        for (h in list) {
+            val obj = JSONObject()
+            obj.put("id", h.id)
+            obj.put("title", h.title)
+            obj.put("image", h.image)
+            obj.put("type", h.type)
+            obj.put("pos", h.position)
+            obj.put("dur", h.duration)
+            jsonArray.put(obj)
+        }
+        
+        context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+            .edit().putString(KEY_HISTORY, jsonArray.toString()).apply()
     }
 }
