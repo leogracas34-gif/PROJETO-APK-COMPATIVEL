@@ -22,6 +22,7 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.bumptech.glide.Glide
+import com.bumptech.glide.load.DecodeFormat
 import com.bumptech.glide.load.engine.DiskCacheStrategy
 import retrofit2.Call
 import retrofit2.Callback
@@ -40,7 +41,7 @@ class VodActivity : AppCompatActivity() {
 
     // Cache em memória
     private var cachedCategories: List<LiveCategory>? = null
-    private val moviesCache = mutableMapOf<String, List<VodStream>>() // key = categoryId
+    private val moviesCache = mutableMapOf<String, List<VodStream>>()
     private var favMoviesCache: List<VodStream>? = null
 
     private var categoryAdapter: VodCategoryAdapter? = null
@@ -62,12 +63,12 @@ class VodActivity : AppCompatActivity() {
         username = prefs.getString("username", "") ?: ""
         password = prefs.getString("password", "") ?: ""
 
-        // ✅ FOCO TV + D-PAD PERFEITO
         setupRecyclerFocus()
 
         rvCategories.layoutManager = LinearLayoutManager(this, RecyclerView.VERTICAL, false)
         rvCategories.setHasFixedSize(true)
         rvCategories.isFocusable = true
+        // Importante para a lista lateral não roubar foco sem querer
         rvCategories.descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
 
         // Mantendo 5 colunas para TV
@@ -76,40 +77,32 @@ class VodActivity : AppCompatActivity() {
         rvMovies.descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
         rvMovies.setHasFixedSize(true)
 
-        // ✅ Foco inicial categorias TV
+        // Foco inicial nas categorias (Padrão TV)
         rvCategories.requestFocus()
 
         carregarCategorias()
     }
 
-    // ✅ MELHOR NAVEGAÇÃO ENTRE RECYCLERVIEWS (TV)
     private fun setupRecyclerFocus() {
-        rvCategories.setOnFocusChangeListener { _, hasFocus ->
-            if (hasFocus) {
-                rvCategories.smoothScrollToPosition(0)
-            }
-        }
-        
+        // CORREÇÃO CRÍTICA DE FOCO PULANDO
+        // Quando a lista de filmes ganha foco, garante que não saia "sozinha"
         rvMovies.setOnFocusChangeListener { _, hasFocus ->
             if (hasFocus) {
-                rvMovies.smoothScrollToPosition(0)
+                // Se o foco caiu no container da lista, joga pro primeiro item
+                if (rvMovies.childCount > 0) {
+                    rvMovies.getChildAt(0).requestFocus()
+                }
             }
         }
     }
 
-    // -------- helper p/ detectar adulto --------
     private fun isAdultName(name: String?): Boolean {
         if (name.isNullOrBlank()) return false
         val n = name.lowercase()
-        return n.contains("+18") ||
-                n.contains("adult") ||
-                n.contains("xxx") ||
-                n.contains("hot") ||
-                n.contains("sexo")
+        return n.contains("+18") || n.contains("adult") || n.contains("xxx") || n.contains("hot") || n.contains("sexo")
     }
 
     private fun carregarCategorias() {
-        // Usa cache se já tiver
         cachedCategories?.let { categoriasCacheadas ->
             aplicarCategorias(categoriasCacheadas)
             return
@@ -128,41 +121,24 @@ class VodActivity : AppCompatActivity() {
                         val originais = response.body()!!
 
                         var categorias = mutableListOf<LiveCategory>()
-                        categorias.add(
-                            LiveCategory(
-                                category_id = "FAV",
-                                category_name = "FAVORITOS"
-                            )
-                        )
+                        categorias.add(LiveCategory(category_id = "FAV", category_name = "FAVORITOS"))
                         categorias.addAll(originais)
 
-                        // cache bruto
                         cachedCategories = categorias
 
-                        // se controle parental ligado, remove categorias adultas
                         if (ParentalControlManager.isEnabled(this@VodActivity)) {
-                            categorias = categorias.filterNot { cat ->
-                                isAdultName(cat.name)
-                            }.toMutableList()
+                            categorias = categorias.filterNot { cat -> isAdultName(cat.name) }.toMutableList()
                         }
 
                         aplicarCategorias(categorias)
                     } else {
-                        Toast.makeText(
-                            this@VodActivity,
-                            "Erro ao carregar categorias",
-                            Toast.LENGTH_SHORT
-                        ).show()
+                        Toast.makeText(this@VodActivity, "Erro ao carregar categorias", Toast.LENGTH_SHORT).show()
                     }
                 }
 
                 override fun onFailure(call: Call<List<LiveCategory>>, t: Throwable) {
                     progressBar.visibility = View.GONE
-                    Toast.makeText(
-                        this@VodActivity,
-                        "Falha de conexão",
-                        Toast.LENGTH_SHORT
-                    ).show()
+                    Toast.makeText(this@VodActivity, "Falha de conexão", Toast.LENGTH_SHORT).show()
                 }
             })
     }
@@ -196,7 +172,6 @@ class VodActivity : AppCompatActivity() {
     private fun carregarFilmes(categoria: LiveCategory) {
         tvCategoryTitle.text = categoria.name
 
-        // cache por categoria
         moviesCache[categoria.id]?.let { filmesCacheados ->
             aplicarFilmes(filmesCacheados)
             return
@@ -217,9 +192,7 @@ class VodActivity : AppCompatActivity() {
                         moviesCache[categoria.id] = filmes
 
                         if (ParentalControlManager.isEnabled(this@VodActivity)) {
-                            filmes = filmes.filterNot { vod ->
-                                isAdultName(vod.name) || isAdultName(vod.title)
-                            }
+                            filmes = filmes.filterNot { vod -> isAdultName(vod.name) || isAdultName(vod.title) }
                         }
 
                         aplicarFilmes(filmes)
@@ -235,7 +208,6 @@ class VodActivity : AppCompatActivity() {
     private fun carregarFilmesFavoritos() {
         tvCategoryTitle.text = "FAVORITOS"
 
-        // usa cache se já montou uma vez
         favMoviesCache?.let { favoritosCacheados ->
             aplicarFilmes(favoritosCacheados)
             return
@@ -263,9 +235,7 @@ class VodActivity : AppCompatActivity() {
                         todos = todos.filter { favIds.contains(it.id) }
 
                         if (ParentalControlManager.isEnabled(this@VodActivity)) {
-                            todos = todos.filterNot { vod ->
-                                isAdultName(vod.name) || isAdultName(vod.title)
-                            }
+                            todos = todos.filterNot { vod -> isAdultName(vod.name) || isAdultName(vod.title) }
                         }
 
                         favMoviesCache = todos
@@ -304,8 +274,6 @@ class VodActivity : AppCompatActivity() {
         return set.mapNotNull { it.toIntOrNull() }.toMutableSet()
     }
 
-    // ================= MENU DOWNLOAD =================
-
     private fun mostrarMenuDownload(filme: VodStream) {
         val anchor = findViewById<View>(android.R.id.content)
         val popup = PopupMenu(this, anchor)
@@ -320,26 +288,10 @@ class VodActivity : AppCompatActivity() {
 
         popup.setOnMenuItemClickListener { item: MenuItem ->
             when (item.itemId) {
-                R.id.action_download -> {
-                    iniciarDownloadReal(filme)
-                    true
-                }
-
-                R.id.action_pause -> {
-                    pausarDownload(filme.id)
-                    true
-                }
-
-                R.id.action_cancel -> {
-                    cancelarDownload(filme.id)
-                    true
-                }
-
-                R.id.action_meus_downloads -> {
-                    abrirDownloadsPremium(filme)
-                    true
-                }
-
+                R.id.action_download -> { iniciarDownloadReal(filme); true }
+                R.id.action_pause -> { pausarDownload(filme.id); true }
+                R.id.action_cancel -> { cancelarDownload(filme.id); true }
+                R.id.action_meus_downloads -> { abrirDownloadsPremium(filme); true }
                 else -> false
             }
         }
@@ -351,10 +303,7 @@ class VodActivity : AppCompatActivity() {
         val base = if (dns.endsWith("/")) dns else "$dns/"
         val url = "${base}movie/$username/$password/${filme.id}.${filme.extension ?: "mp4"}"
 
-        prefs.edit()
-            .putBoolean("downloading_${filme.id}", true)
-            .apply()
-
+        prefs.edit().putBoolean("downloading_${filme.id}", true).apply()
         Toast.makeText(this, "Baixando: ${filme.name}", Toast.LENGTH_LONG).show()
     }
 
@@ -369,11 +318,7 @@ class VodActivity : AppCompatActivity() {
     }
 
     private fun abrirDownloadsPremium(filme: VodStream) {
-        Toast.makeText(
-            this,
-            "Meus downloads (premium) – ${filme.name}",
-            Toast.LENGTH_LONG
-        ).show()
+        Toast.makeText(this, "Meus downloads (premium) – ${filme.name}", Toast.LENGTH_LONG).show()
     }
 
     // ================= ADAPTERS =================
@@ -390,8 +335,7 @@ class VodActivity : AppCompatActivity() {
         }
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
-            val v = LayoutInflater.from(parent.context)
-                .inflate(R.layout.item_category, parent, false)
+            val v = LayoutInflater.from(parent.context).inflate(R.layout.item_category, parent, false)
             return VH(v)
         }
 
@@ -399,7 +343,6 @@ class VodActivity : AppCompatActivity() {
             val item = list[position]
             holder.tvName.text = item.name
 
-            // Lógica de seleção (Mantida, mas melhorada)
             val isSelected = (selectedPos == position)
             if (isSelected) {
                 holder.tvName.setTextColor(holder.itemView.context.getColor(R.color.red_primary))
@@ -412,11 +355,18 @@ class VodActivity : AppCompatActivity() {
             holder.itemView.isFocusable = true
             holder.itemView.isClickable = true
 
-            // Foco Visual nas Categorias
+            // Lógica de Foco Lateral
             holder.itemView.setOnFocusChangeListener { _, hasFocus ->
                 if (hasFocus) {
                     holder.tvName.setTextColor(holder.itemView.context.getColor(R.color.red_primary))
                     holder.tvName.setBackgroundColor(0xFF252525.toInt())
+                    // Se a categoria ganha foco, seleciona ela automaticamente (Opcional, mas bom pra TV)
+                    if (selectedPos != holder.adapterPosition) {
+                        notifyItemChanged(selectedPos)
+                        selectedPos = holder.adapterPosition
+                        notifyItemChanged(selectedPos)
+                        onClick(item)
+                    }
                 } else {
                     if (selectedPos != holder.adapterPosition) {
                         holder.tvName.setTextColor(holder.itemView.context.getColor(R.color.gray_text))
@@ -449,8 +399,7 @@ class VodActivity : AppCompatActivity() {
         }
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
-            val v = LayoutInflater.from(parent.context)
-                .inflate(R.layout.item_vod, parent, false)
+            val v = LayoutInflater.from(parent.context).inflate(R.layout.item_vod, parent, false)
             return VH(v)
         }
 
@@ -458,11 +407,12 @@ class VodActivity : AppCompatActivity() {
             val item = list[position]
             holder.tvName.text = item.name
 
-            // CORREÇÃO GLIDE: override para economizar memória e mostrar capas na TV antiga
+            // GLIDE SUPER ECONÔMICO (RGB_565 + 200x300)
             Glide.with(holder.itemView.context)
                 .load(item.icon)
-                .diskCacheStrategy(DiskCacheStrategy.ALL) // Cache total
-                .override(300, 450) // Força tamanho pequeno para não estourar memória
+                .diskCacheStrategy(DiskCacheStrategy.ALL)
+                .format(DecodeFormat.PREFER_RGB_565) // 50% menos memória
+                .override(200, 300) // Reduzido um pouco mais pra garantir
                 .placeholder(R.drawable.bg_logo_placeholder)
                 .error(R.drawable.bg_logo_placeholder)
                 .centerCrop()
@@ -471,21 +421,31 @@ class VodActivity : AppCompatActivity() {
             holder.itemView.isFocusable = true
             holder.itemView.isClickable = true
 
-            // LÓGICA DE FOCO (Amarelo e Zoom)
+            // CORREÇÃO: FOCO AMARELO + BORDA
             holder.itemView.setOnFocusChangeListener { view, hasFocus ->
                 if (hasFocus) {
-                    // Efeito de Zoom
+                    // Zoom
                     view.animate().scaleX(1.1f).scaleY(1.1f).setDuration(150).start()
-                    // Cor Amarelo Ouro
+                    // Borda Amarela (Tente usar o drawable se criou, senão use cor sólida)
+                    try {
+                        view.setBackgroundResource(R.drawable.focus_border)
+                    } catch (e: Exception) {
+                        // Fallback se não criou o XML: Borda sólida via código
+                        view.setBackgroundColor(Color.parseColor("#FFD700"))
+                        view.setPadding(4,4,4,4) 
+                    }
+                    
                     holder.tvName.setTextColor(Color.parseColor("#FFD700"))
-                    holder.tvName.setBackgroundColor(Color.parseColor("#CC000000")) // Fundo escuro para ler melhor
-                    view.alpha = 1.0f
+                    holder.tvName.setBackgroundColor(Color.parseColor("#CC000000"))
+                    view.elevation = 10f
                 } else {
-                    // Volta ao normal
                     view.animate().scaleX(1.0f).scaleY(1.0f).setDuration(150).start()
+                    view.setBackgroundResource(0) // Remove borda
+                    view.setPadding(0,0,0,0) // Remove padding
+                    
                     holder.tvName.setTextColor(Color.WHITE)
-                    holder.tvName.setBackgroundColor(Color.parseColor("#00000000")) // Transparente
-                    view.alpha = 1.0f
+                    holder.tvName.setBackgroundColor(Color.TRANSPARENT)
+                    view.elevation = 0f
                 }
             }
 
@@ -496,7 +456,6 @@ class VodActivity : AppCompatActivity() {
         override fun getItemCount() = list.size
     }
 
-    // ✅ BACK = SAIR (TV + Celular)
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         if (keyCode == KeyEvent.KEYCODE_BACK) {
             finish()
