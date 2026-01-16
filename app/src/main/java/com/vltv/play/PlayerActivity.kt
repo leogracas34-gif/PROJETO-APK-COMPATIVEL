@@ -359,12 +359,11 @@ class PlayerActivity : AppCompatActivity() {
 
         val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory)
 
-        // CONFIGURAÇÃO TURBO
-        val isLive = streamType == "live"
-        val minBufferMs = if (isLive) 2000 else 2000
-        val maxBufferMs = if (isLive) 5000 else 15000
-        val playBufferMs = 1000
-        val playRebufferMs = 2000
+        // CONFIGURAÇÃO DE BUFFER ANTI-LAG (4G ESTÁVEL)
+        val minBufferMs = 2500     // Abre rápido (2.5 seg)
+        val maxBufferMs = 45000    // Tenta guardar até 45 segundos se a internet permitir
+        val playBufferMs = 2500    // Precisa de 2.5 seg para dar o primeiro play
+        val playRebufferMs = 5000  // Se travar, carrega 5 seg para não travar de novo logo em seguida
 
         val loadControl = androidx.media3.exoplayer.DefaultLoadControl.Builder()
             .setBufferDurationsMs(
