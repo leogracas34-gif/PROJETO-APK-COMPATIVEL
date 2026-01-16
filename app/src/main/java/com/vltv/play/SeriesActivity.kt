@@ -15,6 +15,7 @@ import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
+import com.bumptech.glide.load.DecodeFormat
 import com.bumptech.glide.load.engine.DiskCacheStrategy
 import retrofit2.Call
 import retrofit2.Callback
@@ -45,10 +46,8 @@ class SeriesActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_live_tv)
 
-        val windowInsetsController = WindowCompat.getInsetsController(window,
-        window.decorView)
-        windowInsetsController.systemBarsBehavior =
-        WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        val windowInsetsController = WindowCompat.getInsetsController(window, window.decorView)
+        windowInsetsController.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         windowInsetsController.hide(WindowInsetsCompat.Type.systemBars())
 
         rvCategories = findViewById(R.id.rvCategories)
@@ -60,12 +59,12 @@ class SeriesActivity : AppCompatActivity() {
         username = prefs.getString("username", "") ?: ""
         password = prefs.getString("password", "") ?: ""
 
-        // ✅ FOCO TV + D-PAD
         setupRecyclerFocus()
 
         rvCategories.layoutManager = LinearLayoutManager(this, RecyclerView.VERTICAL, false)
         rvCategories.setHasFixedSize(true)
         rvCategories.isFocusable = true
+        // Evita que a lista lateral roube foco ao rolar a grade
         rvCategories.descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
 
         // Mantendo 5 colunas para TV
@@ -80,30 +79,22 @@ class SeriesActivity : AppCompatActivity() {
         carregarCategorias()
     }
 
-    // ✅ MELHOR NAVEGAÇÃO ENTRE RECYCLERVIEWS (TV)
     private fun setupRecyclerFocus() {
-        rvCategories.setOnFocusChangeListener { _, hasFocus ->
-            if (hasFocus) {
-                rvCategories.smoothScrollToPosition(0)
-            }
-        }
-        
+        // TRAVA DE NAVEGAÇÃO: Impede que o foco pule para a esquerda acidentalmente
         rvSeries.setOnFocusChangeListener { _, hasFocus ->
             if (hasFocus) {
-                rvSeries.smoothScrollToPosition(0)
+                // Se o foco cair no container, joga pro primeiro item
+                if (rvSeries.childCount > 0) {
+                    rvSeries.getChildAt(0).requestFocus()
+                }
             }
         }
     }
 
-    // -------- helper p/ detectar adulto --------
     private fun isAdultName(name: String?): Boolean {
         if (name.isNullOrBlank()) return false
         val n = name.lowercase()
-        return n.contains("+18") ||
-                n.contains("adult") ||
-                n.contains("xxx") ||
-                n.contains("hot") ||
-                n.contains("sexo")
+        return n.contains("+18") || n.contains("adult") || n.contains("xxx") || n.contains("hot") || n.contains("sexo")
     }
 
     private fun carregarCategorias() {
@@ -125,40 +116,24 @@ class SeriesActivity : AppCompatActivity() {
                         val originais = response.body()!!
 
                         var categorias = mutableListOf<LiveCategory>()
-                        categorias.add(
-                            LiveCategory(
-                                category_id = "FAV_SERIES",
-                                category_name = "FAVORITOS"
-                            )
-                        )
+                        categorias.add(LiveCategory(category_id = "FAV_SERIES", category_name = "FAVORITOS"))
                         categorias.addAll(originais)
 
                         cachedCategories = categorias
 
-                        // se controle parental ligado, remove categorias adultas
                         if (ParentalControlManager.isEnabled(this@SeriesActivity)) {
-                            categorias = categorias.filterNot { cat ->
-                                isAdultName(cat.name)
-                            }.toMutableList()
+                            categorias = categorias.filterNot { cat -> isAdultName(cat.name) }.toMutableList()
                         }
 
                         aplicarCategorias(categorias)
                     } else {
-                        Toast.makeText(
-                            this@SeriesActivity,
-                            "Erro ao carregar categorias",
-                            Toast.LENGTH_SHORT
-                        ).show()
+                        Toast.makeText(this@SeriesActivity, "Erro ao carregar categorias", Toast.LENGTH_SHORT).show()
                     }
                 }
 
                 override fun onFailure(call: Call<List<LiveCategory>>, t: Throwable) {
                     progressBar.visibility = View.GONE
-                    Toast.makeText(
-                        this@SeriesActivity,
-                        "Falha de conexão",
-                        Toast.LENGTH_SHORT
-                    ).show()
+                    Toast.makeText(this@SeriesActivity, "Falha de conexão", Toast.LENGTH_SHORT).show()
                 }
             })
     }
@@ -212,9 +187,7 @@ class SeriesActivity : AppCompatActivity() {
                         seriesCache[categoria.id] = series
 
                         if (ParentalControlManager.isEnabled(this@SeriesActivity)) {
-                            series = series.filterNot { s ->
-                                isAdultName(s.name)
-                            }
+                            series = series.filterNot { s -> isAdultName(s.name) }
                         }
 
                         aplicarSeries(series)
@@ -257,9 +230,7 @@ class SeriesActivity : AppCompatActivity() {
                         todas = todas.filter { favIds.contains(it.id) }
 
                         if (ParentalControlManager.isEnabled(this@SeriesActivity)) {
-                            todas = todas.filterNot { s ->
-                                isAdultName(s.name)
-                            }
+                            todas = todas.filterNot { s -> isAdultName(s.name) }
                         }
 
                         favSeriesCache = todas
@@ -309,8 +280,7 @@ class SeriesActivity : AppCompatActivity() {
         }
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
-            val v = LayoutInflater.from(parent.context)
-                .inflate(R.layout.item_category, parent, false)
+            val v = LayoutInflater.from(parent.context).inflate(R.layout.item_category, parent, false)
             return VH(v)
         }
 
@@ -318,7 +288,6 @@ class SeriesActivity : AppCompatActivity() {
             val item = list[position]
             holder.tvName.text = item.name
 
-            // Lógica visual de seleção
             val isSelected = (selectedPos == position)
             if (isSelected) {
                 holder.tvName.setTextColor(holder.itemView.context.getColor(R.color.red_primary))
@@ -331,11 +300,18 @@ class SeriesActivity : AppCompatActivity() {
             holder.itemView.isFocusable = true
             holder.itemView.isClickable = true
 
-            // Foco Visual nas Categorias (TV)
+            // Lógica de seleção lateral (Padrão TV)
             holder.itemView.setOnFocusChangeListener { _, hasFocus ->
                 if (hasFocus) {
                     holder.tvName.setTextColor(holder.itemView.context.getColor(R.color.red_primary))
                     holder.tvName.setBackgroundColor(0xFF252525.toInt())
+                    // Auto-seleciona ao passar o foco
+                    if (selectedPos != holder.adapterPosition) {
+                        notifyItemChanged(selectedPos)
+                        selectedPos = holder.adapterPosition
+                        notifyItemChanged(selectedPos)
+                        onClick(item)
+                    }
                 } else {
                     if (selectedPos != holder.adapterPosition) {
                         holder.tvName.setTextColor(holder.itemView.context.getColor(R.color.gray_text))
@@ -366,8 +342,7 @@ class SeriesActivity : AppCompatActivity() {
         }
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
-            val v = LayoutInflater.from(parent.context)
-                .inflate(R.layout.item_vod, parent, false)
+            val v = LayoutInflater.from(parent.context).inflate(R.layout.item_vod, parent, false)
             return VH(v)
         }
 
@@ -375,11 +350,12 @@ class SeriesActivity : AppCompatActivity() {
             val item = list[position]
             holder.tvName.text = item.name
 
-            // CORREÇÃO GLIDE: override para economizar memória e mostrar capas na TV antiga
+            // GLIDE LEVE (RGB_565 + 200x300)
             Glide.with(holder.itemView.context)
                 .load(item.icon)
-                .diskCacheStrategy(DiskCacheStrategy.ALL) // Cache total
-                .override(300, 450) // Força tamanho pequeno para não estourar memória
+                .diskCacheStrategy(DiskCacheStrategy.ALL)
+                .format(DecodeFormat.PREFER_RGB_565) // 50% menos memória
+                .override(200, 300)
                 .placeholder(R.drawable.bg_logo_placeholder)
                 .error(R.drawable.bg_logo_placeholder)
                 .centerCrop()
@@ -388,21 +364,31 @@ class SeriesActivity : AppCompatActivity() {
             holder.itemView.isFocusable = true
             holder.itemView.isClickable = true
 
-            // LÓGICA DE FOCO (Amarelo e Zoom)
+            // CORREÇÃO: FOCO AMARELO + BORDA
             holder.itemView.setOnFocusChangeListener { view, hasFocus ->
                 if (hasFocus) {
-                    // Efeito de Zoom
                     view.animate().scaleX(1.1f).scaleY(1.1f).setDuration(150).start()
-                    // Cor Amarelo Ouro
+                    
+                    // Borda Amarela
+                    try {
+                        view.setBackgroundResource(R.drawable.focus_border)
+                    } catch (e: Exception) {
+                        view.setBackgroundColor(Color.parseColor("#FFD700"))
+                        view.setPadding(4,4,4,4)
+                    }
+
                     holder.tvName.setTextColor(Color.parseColor("#FFD700"))
-                    holder.tvName.setBackgroundColor(Color.parseColor("#CC000000")) // Fundo escuro
-                    view.alpha = 1.0f
+                    holder.tvName.setBackgroundColor(Color.parseColor("#CC000000"))
+                    view.elevation = 10f
                 } else {
-                    // Volta ao normal
                     view.animate().scaleX(1.0f).scaleY(1.0f).setDuration(150).start()
+                    
+                    view.setBackgroundResource(0)
+                    view.setPadding(0,0,0,0)
+                    
                     holder.tvName.setTextColor(Color.WHITE)
-                    holder.tvName.setBackgroundColor(Color.parseColor("#00000000")) // Transparente
-                    view.alpha = 1.0f
+                    holder.tvName.setBackgroundColor(Color.TRANSPARENT)
+                    view.elevation = 0f
                 }
             }
 
