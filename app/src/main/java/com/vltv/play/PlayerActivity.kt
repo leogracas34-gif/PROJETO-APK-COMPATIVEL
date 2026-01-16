@@ -3,6 +3,7 @@ package com.vltv.play
 import android.content.Context
 import android.content.Intent
 import android.graphics.Color
+import android.media.audiofx.LoudnessEnhancer
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
@@ -379,6 +380,20 @@ class PlayerActivity : AppCompatActivity() {
             .setMediaSourceFactory(mediaSourceFactory)
             .setLoadControl(loadControl)
             .build()
+            
+        // --- AQUI ESTÁ A CORREÇÃO DE VOLUME (BOOST) ---
+        try {
+            val audioSessionId = player?.audioSessionId
+            if (audioSessionId != null && audioSessionId != 0) {
+                val loudnessEnhancer = LoudnessEnhancer(audioSessionId)
+                // 1500 mB = um ganho considerável para TVs
+                loudnessEnhancer.setTargetGain(1500)
+                loudnessEnhancer.enabled = true
+            }
+        } catch (e: Exception) {
+            Log.e("AudioBoost", "Falha ao iniciar LoudnessEnhancer: ${e.message}")
+        }
+        // ---------------------------------------------
 
         playerView.player = player
 
@@ -630,6 +645,11 @@ class PlayerActivity : AppCompatActivity() {
     override fun onPause() {
         super.onPause()
         val p = player ?: return
+        
+        // --- AQUI ESTÁ A CORREÇÃO DE PARAR ÁUDIO NO BACKGROUND ---
+        p.playWhenReady = false 
+        // ---------------------------------------------------------
+
         if (streamType == "movie") {
             saveMovieResume(streamId, p.currentPosition, p.duration)
         } else if (streamType == "series") {
