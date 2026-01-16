@@ -8,7 +8,6 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.util.Base64
-import android.util.Log
 import android.view.KeyEvent
 import android.view.View
 import android.widget.Button
@@ -20,6 +19,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
@@ -58,28 +58,23 @@ class PlayerActivity : AppCompatActivity() {
 
     private var offlineUri: String? = null
 
-    // MOCHILA DE EPISÓDIOS (Para saber a sequência dos IDs)
     private var episodeList = ArrayList<Int>()
 
-    // Lista de Backup (Sua lista original)
     private val serverBackupList = listOf(
         "http://tvblack.shop",
         "http://firewallnaousardns.xyz:80",
         "http://fibercdn.sbs"
     )
 
-    // Lista Ativa
     private val activeServerList = mutableListOf<String>()
-
     private var serverIndex = 0
     private val extensoesTentativa = mutableListOf<String>()
     private var extIndex = 0
 
     private val USER_AGENT = "IPTVSmartersPro"
-
     private val handler = Handler(Looper.getMainLooper())
     
-    // --- CORREÇÃO DE FOCO AQUI ---
+    // Checagem do Próximo Episódio
     private val nextChecker = object : Runnable {
         override fun run() {
             val p = player ?: return
@@ -88,15 +83,15 @@ class PlayerActivity : AppCompatActivity() {
                 val pos = p.currentPosition
                 if (dur > 0) {
                     val remaining = dur - pos
+                    // Aparece faltando 60s
                     if (remaining in 1..60_000) {
                         val seconds = (remaining / 1000L).toInt()
                         tvNextEpisodeTitle.text = "Próximo episódio em ${seconds}s"
                         
-                        // Se não estava visível, torna visível e PUXA O FOCO para o botão
                         if (nextEpisodeContainer.visibility != View.VISIBLE) {
                             nextEpisodeContainer.visibility = View.VISIBLE
                             
-                            // TRUQUE: Esconde a barra para o foco ir direto para o botão Próximo
+                            // TRUQUE DE FOCO: Esconde a barra para forçar o foco no botão
                             playerView.hideController()
                             btnPlayNextEpisode.requestFocus()
                         }
@@ -137,7 +132,6 @@ class PlayerActivity : AppCompatActivity() {
         tvNextEpisodeTitle = findViewById(R.id.tvNextEpisodeTitle)
         btnPlayNextEpisode = findViewById(R.id.btnPlayNextEpisode)
 
-        // --- 1. APLICAÇÃO DO VISUAL AMARELO/ZOOM NOS BOTÕES ---
         setupFocusVisuals()
 
         streamId = intent.getIntExtra("stream_id", 0)
@@ -147,13 +141,11 @@ class PlayerActivity : AppCompatActivity() {
         nextStreamId = intent.getIntExtra("next_stream_id", 0)
         nextChannelName = intent.getStringExtra("next_channel_name")
 
-        // Pega a mochila
         val listaExtra = intent.getIntegerArrayListExtra("episode_list")
         if (listaExtra != null) {
             episodeList = listaExtra
         }
 
-        // Tenta descobrir o ID do próximo se não tiver
         calcularProximoEpisodioAutomaticamente()
 
         offlineUri = intent.getStringExtra("offline_uri")
@@ -185,6 +177,10 @@ class PlayerActivity : AppCompatActivity() {
         playerView.setControllerVisibilityListener(
             PlayerView.ControllerVisibilityListener { visibility ->
                 topBar.visibility = visibility
+                // Se a barra aparecer, garante que o foco esteja no PlayerView para capturar setas
+                if (visibility == View.VISIBLE) {
+                    playerView.requestFocus()
+                }
             }
         )
 
@@ -216,10 +212,12 @@ class PlayerActivity : AppCompatActivity() {
         if (streamType == "series" && nextStreamId != 0) {
             handler.post(nextChecker)
         }
+        
+        // Garante foco inicial no player para evitar cliques perdidos
+        playerView.requestFocus()
     }
 
     private fun setupFocusVisuals() {
-        // Botão Próximo Episódio: Amarelo Ouro e Zoom
         btnPlayNextEpisode.isFocusable = true
         btnPlayNextEpisode.isFocusableInTouchMode = true
         btnPlayNextEpisode.setOnFocusChangeListener { v, hasFocus ->
@@ -232,7 +230,6 @@ class PlayerActivity : AppCompatActivity() {
             }
         }
 
-        // Botão Aspecto: Zoom
         btnAspect.isFocusable = true
         btnAspect.setOnFocusChangeListener { v, hasFocus ->
             if (hasFocus) {
@@ -303,17 +300,6 @@ class PlayerActivity : AppCompatActivity() {
             player?.setMediaItem(mediaItem)
             player?.prepare()
             player?.playWhenReady = true
-            player?.addListener(object : Player.Listener {
-                override fun onPlaybackStateChanged(state: Int) {
-                    when (state) {
-                        Player.STATE_READY -> loading.visibility = View.GONE
-                        Player.STATE_BUFFERING -> loading.visibility = View.VISIBLE
-                    }
-                }
-                override fun onPlayerError(error: PlaybackException) {
-                    Toast.makeText(this@PlayerActivity, "Erro offline.", Toast.LENGTH_LONG).show()
-                }
-            })
             return
         }
 
@@ -358,7 +344,7 @@ class PlayerActivity : AppCompatActivity() {
 
         val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory)
 
-        // CONFIGURAÇÃO TURBO
+        // CONFIGURAÇÃO TURBO PARA QUALIDADE MÁXIMA
         val isLive = streamType == "live"
         val minBufferMs = if (isLive) 2000 else 2000
         val maxBufferMs = if (isLive) 5000 else 15000
@@ -380,6 +366,9 @@ class PlayerActivity : AppCompatActivity() {
             .setLoadControl(loadControl)
             .build()
 
+        // Garante que o vídeo tente preencher a melhor qualidade
+        player?.videoScalingMode = C.VIDEO_SCALING_MODE_SCALE_TO_FIT
+        
         playerView.player = player
 
         try {
@@ -425,7 +414,6 @@ class PlayerActivity : AppCompatActivity() {
         iniciarPlayer()
     }
 
-    // --- LÓGICA DE CORREÇÃO DO NOME DO EPISÓDIO ---
     private fun abrirProximoEpisodio() {
         if (nextStreamId == 0) return
 
@@ -582,24 +570,24 @@ class PlayerActivity : AppCompatActivity() {
         })
     }
 
-    // --- CORREÇÃO DA NAVEGAÇÃO (SETAS E OK) ---
+    // --- CORREÇÃO DO BOTÃO OK E NAVEGAÇÃO ---
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-        // 1. Se o botão "Próximo Episódio" apareceu, o OK clica nele imediatamente
+        
+        // 1. Se botão Próximo estiver na tela, OK clica nele
         if (nextEpisodeContainer.visibility == View.VISIBLE && 
            (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER)) {
              abrirProximoEpisodio()
              return true
         }
 
-        // 2. SE A BARRA ESTIVER VISÍVEL: Libera as setas para navegar na Linha do Tempo
+        // 2. Se a barra estiver VISÍVEL, deixa o Android controlar o foco
+        // Isso permite: Seta Baixo -> Focar Barra -> Esquerda/Direita para navegar no tempo
         if (playerView.isControllerFullyVisible) {
-            // Retorna 'super' para deixar o Android controlar o foco (ir para a barra, play, pause, etc)
-            // Assim, se você apertar OK, ele clica no que estiver focado (Barra ou Play)
-            // Se apertar Baixo, ele desce para a barra. Se apertar Esquerda/Direita na barra, ele corre o filme.
+            // Se apertar OK com foco na barra, ele executa a ação da barra (ou Play/Pause)
             return super.onKeyDown(keyCode, event)
         }
 
-        // 3. SE A BARRA ESTIVER ESCONDIDA: Usa os atalhos rápidos
+        // 3. Se a barra estiver ESCONDIDA, OK abre a barra e Pausa
         val p = player ?: return super.onKeyDown(keyCode, event)
         return when (keyCode) {
             KeyEvent.KEYCODE_DPAD_LEFT -> {
@@ -615,8 +603,12 @@ class PlayerActivity : AppCompatActivity() {
                 true
             }
             KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
-                // Se estava escondido, mostra a barra para você poder navegar
+                // MOSTRA A BARRA E PAUSA (Comportamento solicitado)
                 playerView.showController()
+                if (p.isPlaying) {
+                    p.pause()
+                }
+                // Retorna true para EVITAR O ZOOM do sistema
                 true
             }
             KeyEvent.KEYCODE_BACK -> {
