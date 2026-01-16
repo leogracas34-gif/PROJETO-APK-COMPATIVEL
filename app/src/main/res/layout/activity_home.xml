@@ -70,7 +70,7 @@
         android:id="@+id/cardBanner"
         android:layout_width="0dp"
         android:layout_height="0dp"
-        app:layout_constraintHeight_percent="0.42"
+        app:layout_constraintHeight_percent="0.35"
         android:layout_marginHorizontal="16dp"
         android:layout_marginTop="4dp"
         app:cardCornerRadius="14dp"
@@ -78,7 +78,7 @@
         app:cardElevation="6dp"
         android:focusable="true"
         android:nextFocusUp="@id/etSearch"
-        android:nextFocusDown="@id/cardMovies"
+        android:nextFocusDown="@id/rvContinueWatching"
         app:layout_constraintTop_toBottomOf="@id/headerLayout"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
@@ -133,17 +133,46 @@
         </FrameLayout>
     </androidx.cardview.widget.CardView>
 
+    <TextView
+        android:id="@+id/tvContinueTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="CONTINUAR ASSISTINDO"
+        android:textColor="#FFD700"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:letterSpacing="0.05"
+        android:layout_marginStart="24dp"
+        android:layout_marginTop="16dp"
+        android:visibility="gone"
+        app:layout_constraintTop_toBottomOf="@id/cardBanner"
+        app:layout_constraintStart_toStartOf="parent" />
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rvContinueWatching"
+        android:layout_width="match_parent"
+        android:layout_height="130dp"
+        android:paddingStart="16dp"
+        android:clipToPadding="false"
+        android:orientation="horizontal"
+        android:visibility="gone"
+        android:nextFocusUp="@id/cardBanner"
+        android:nextFocusDown="@id/buttonsContainer"
+        app:layout_constraintTop_toBottomOf="@id/tvContinueTitle"
+        app:layout_constraintStart_toStartOf="parent" />
+
     <LinearLayout
+        android:id="@+id/buttonsContainer"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:orientation="horizontal"
         android:paddingHorizontal="24dp"
-        android:paddingTop="20dp"
+        android:paddingTop="12dp"
         android:paddingBottom="24dp"
         android:clipChildren="false"
         android:clipToPadding="false"
         android:baselineAligned="false"
-        app:layout_constraintTop_toBottomOf="@id/cardBanner"
+        app:layout_constraintTop_toBottomOf="@id/rvContinueWatching"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
@@ -159,7 +188,7 @@
             android:foreground="?attr/selectableItemBackground"
             android:clickable="true"
             android:focusable="true"
-            android:nextFocusUp="@id/cardBanner"
+            android:nextFocusUp="@id/rvContinueWatching"
             android:nextFocusRight="@id/cardMovies"
             app:cardBackgroundColor="@android:color/transparent">
 
@@ -174,7 +203,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="📺"
-                    android:textSize="36sp"
+                    android:textSize="32sp"
                     android:layout_marginBottom="8dp"/>
 
                 <TextView
@@ -199,7 +228,7 @@
             android:foreground="?attr/selectableItemBackground"
             android:clickable="true"
             android:focusable="true"
-            android:nextFocusUp="@id/cardBanner"
+            android:nextFocusUp="@id/rvContinueWatching"
             android:nextFocusLeft="@id/cardLiveTv"
             android:nextFocusRight="@id/cardSeries"
             app:cardBackgroundColor="@android:color/transparent">
@@ -215,7 +244,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="🎬"
-                    android:textSize="36sp"
+                    android:textSize="32sp"
                     android:layout_marginBottom="8dp"/>
 
                 <TextView
@@ -240,7 +269,7 @@
             android:foreground="?attr/selectableItemBackground"
             android:clickable="true"
             android:focusable="true"
-            android:nextFocusUp="@id/cardBanner"
+            android:nextFocusUp="@id/rvContinueWatching"
             android:nextFocusLeft="@id/cardMovies"
             app:cardBackgroundColor="@android:color/transparent">
 
@@ -255,7 +284,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="🍿"
-                    android:textSize="36sp"
+                    android:textSize="32sp"
                     android:layout_marginBottom="8dp"/>
 
                 <TextView
