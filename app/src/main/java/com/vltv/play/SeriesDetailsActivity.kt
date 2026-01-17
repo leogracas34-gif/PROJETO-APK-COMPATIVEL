@@ -42,8 +42,8 @@ class SeriesDetailsActivity : AppCompatActivity() {
     private lateinit var tvTitle: TextView
     private lateinit var tvRating: TextView
     private lateinit var tvGenre: TextView
-    private lateinit var tvCast: TextView 
-    private lateinit var recyclerCast: RecyclerView 
+    private lateinit var tvCast: TextView // Título "Elenco"
+    private lateinit var recyclerCast: RecyclerView // Lista de bolinhas (Novo)
     private lateinit var tvPlot: TextView
     private lateinit var btnSeasonSelector: TextView
     private lateinit var rvEpisodes: RecyclerView
@@ -55,7 +55,7 @@ class SeriesDetailsActivity : AppCompatActivity() {
     private lateinit var tvDownloadEpisodeState: TextView
 
     private lateinit var btnDownloadSeason: Button
-    private lateinit var btnResume: Button 
+    private lateinit var btnResume: Button // Botão Continuar
 
     private var episodesBySeason: Map<String, List<EpisodeStream>> = emptyMap()
     private var sortedSeasons: List<String> = emptyList()
@@ -91,17 +91,19 @@ class SeriesDetailsActivity : AppCompatActivity() {
 
         btnSeasonSelector.setBackgroundColor(Color.parseColor("#333333"))
 
+        // CORREÇÃO: Glide com estratégia de cache e redimensionamento para TV Box antiga
         Glide.with(this)
             .load(seriesIcon)
             .placeholder(R.mipmap.ic_launcher)
             .diskCacheStrategy(DiskCacheStrategy.ALL)
-            .override(300, 450) 
+            .override(300, 450) // Reduz memória
             .centerCrop()
             .into(imgPoster)
 
         rvEpisodes.isFocusable = true
         rvEpisodes.isFocusableInTouchMode = true
         rvEpisodes.setHasFixedSize(true)
+        // Ajuste de Colunas: 5 para TV ficar bonito
         rvEpisodes.layoutManager = androidx.recyclerview.widget.GridLayoutManager(this, if (isTelevisionDevice()) 5 else 4)
         
         rvEpisodes.addOnChildAttachStateChangeListener(object : RecyclerView.OnChildAttachStateChangeListener {
@@ -242,10 +244,11 @@ class SeriesDetailsActivity : AppCompatActivity() {
                                 if (vote > 0) tvRating.text = "Nota: ${String.format("%.1f", vote)}"
                                 val backdropPath = show.optString("backdrop_path")
                                 if (backdropPath.isNotEmpty() && imgBackground != imgPoster) {
+                                    // CORREÇÃO: Limita tamanho da imagem de fundo para evitar tela preta
                                     Glide.with(this@SeriesDetailsActivity)
                                         .load("https://image.tmdb.org/t/p/w1280$backdropPath")
                                         .diskCacheStrategy(DiskCacheStrategy.ALL)
-                                        .override(800, 450)
+                                        .override(800, 450) // Força resolução menor para TV Box antiga
                                         .centerCrop().into(imgBackground)
                                 }
                                 Glide.with(this@SeriesDetailsActivity).load(seriesIcon).placeholder(R.mipmap.ic_launcher).centerCrop().into(imgPoster)
@@ -332,7 +335,6 @@ class SeriesDetailsActivity : AppCompatActivity() {
         val username = prefs.getString("username", "") ?: ""
         val password = prefs.getString("password", "") ?: ""
 
-        // AQUI USA O XTREAM API, QUE PEGA O BASE URL CORRETO DO HOME/LOGIN
         XtreamApi.service.getSeriesInfoV2(username, password, seriesId = seriesId)
             .enqueue(object : Callback<SeriesInfoResponse> {
                 override fun onResponse(call: Call<SeriesInfoResponse>, response: Response<SeriesInfoResponse>) {
@@ -350,14 +352,19 @@ class SeriesDetailsActivity : AppCompatActivity() {
             })
     }
 
+    // ==========================================================
+    // MUDANÇA PRINCIPAL: ABRIR O BOTTOM SHEET ESTILO DISNEY
+    // ==========================================================
     private fun mostrarSeletorDeTemporada() {
         if (sortedSeasons.isEmpty()) return
         
+        // Em vez de AlertDialog, chamamos o nosso novo Menu Transparente
         val sheet = SeasonBottomSheet(sortedSeasons) { selectedSeason ->
             mudarTemporada(selectedSeason)
         }
         sheet.show(supportFragmentManager, "SeasonSheet")
     }
+    // ==========================================================
 
     private fun mudarTemporada(seasonKey: String) {
         currentSeason = seasonKey
@@ -385,6 +392,9 @@ class SeriesDetailsActivity : AppCompatActivity() {
         }
     }
 
+    // =========================================================================
+    //  ATENÇÃO: LÓGICA DO PLAYER E BOTÃO "PRÓXIMO" REVISADA E BLINDADA
+    // =========================================================================
     private fun abrirPlayer(ep: EpisodeStream, usarResume: Boolean) {
         val streamId = ep.id.toIntOrNull() ?: 0
         val ext = ep.container_extension ?: "mp4"
@@ -392,10 +402,12 @@ class SeriesDetailsActivity : AppCompatActivity() {
         val lista = episodesBySeason[currentSeason] ?: emptyList()
         val position = lista.indexOfFirst { it.id == ep.id }
         
+        // 1. Encontra o próximo episódio para o botão "Próximo"
         val nextEp = if (position + 1 < lista.size) lista[position + 1] else null
         val nextStreamId = nextEp?.id?.toIntOrNull() ?: 0
         val nextChannelName = nextEp?.let { "T${currentSeason}E${it.episode_num} - $seriesName" }
 
+        // 2. Cria a "Mochila" (Lista Completa) para o Player
         val mochilaIds = ArrayList<Int>()
         for (item in lista) {
             val idInt = item.id.toIntOrNull() ?: 0
@@ -414,12 +426,14 @@ class SeriesDetailsActivity : AppCompatActivity() {
         intent.putExtra("stream_type", "series")
         intent.putExtra("channel_name", "T${currentSeason}E${ep.episode_num} - $seriesName")
         
+        // 3. Passa a Mochila (Isso é crucial para o botão Próximo funcionar)
         if (mochilaIds.isNotEmpty()) {
             intent.putIntegerArrayListExtra("episode_list", mochilaIds)
         }
 
         if (existe) intent.putExtra("start_position_ms", pos)
         
+        // 4. Passa os dados do próximo episódio
         if (nextStreamId != 0) {
             intent.putExtra("next_stream_id", nextStreamId)
             if (nextChannelName != null) intent.putExtra("next_channel_name", nextChannelName)
@@ -428,17 +442,13 @@ class SeriesDetailsActivity : AppCompatActivity() {
         startActivity(intent)
     }
 
-    // ==========================================================
-    // CORREÇÃO CRÍTICA AQUI: USA O DNS SALVO NO LOGIN
-    // ==========================================================
     private fun montarUrlEpisodio(ep: EpisodeStream): String {
         val prefs = getSharedPreferences("vltv_prefs", Context.MODE_PRIVATE)
         val user = prefs.getString("username", "") ?: ""
         val pass = prefs.getString("password", "") ?: ""
 
-        // CORREÇÃO: Pega o DNS que o login salvou. Se não tiver, usa o backup.
-        val savedDns = prefs.getString("dns", "")
-        val server = if (!savedDns.isNullOrBlank()) savedDns else "http://tvblack.shop"
+        val serverList = listOf("http://tvblack.shop", "http://firewallnaousardns.xyz:80", "http://fibercdn.sbs")
+        val server = serverList.first()
 
         val eid = ep.id.toIntOrNull() ?: 0
         val ext = ep.container_extension ?: "mp4"
@@ -534,11 +544,12 @@ class SeriesDetailsActivity : AppCompatActivity() {
             holder.tvTitle.text = "E${ep.episode_num.toString().padStart(2, '0')} - ${ep.title}"
             
             if (holder.imgThumb != null) {
+                // CORREÇÃO: Limita tamanho da capa para não estourar memória na TV antiga
                 Glide.with(holder.itemView.context)
                     .load(ep.info?.movie_image)
                     .placeholder(android.R.drawable.ic_menu_gallery)
                     .error(android.R.color.darker_gray)
-                    .override(300, 200)
+                    .override(300, 200) // Mais leve
                     .diskCacheStrategy(DiskCacheStrategy.ALL)
                     .centerCrop()
                     .into(holder.imgThumb)
@@ -546,10 +557,12 @@ class SeriesDetailsActivity : AppCompatActivity() {
             holder.itemView.setOnClickListener { onClick(ep, position) }
             holder.itemView.setOnFocusChangeListener { view, hasFocus ->
                 if (hasFocus) {
+                    // EFEITO DE ZOOM E COR FORTE (AMARELO OURO)
                     view.animate().scaleX(1.08f).scaleY(1.08f).setDuration(150).start()
-                    holder.tvTitle.setTextColor(Color.parseColor("#FFD700")) 
-                    holder.tvTitle.setBackgroundColor(Color.parseColor("#E6000000")) 
+                    holder.tvTitle.setTextColor(Color.parseColor("#FFD700")) // Amarelo Ouro
+                    holder.tvTitle.setBackgroundColor(Color.parseColor("#E6000000")) // Fundo mais escuro
                 } else {
+                    // VOLTA AO NORMAL
                     view.animate().scaleX(1.0f).scaleY(1.0f).setDuration(150).start()
                     holder.tvTitle.setTextColor(Color.WHITE)
                     holder.tvTitle.setBackgroundColor(Color.parseColor("#D9000000"))
