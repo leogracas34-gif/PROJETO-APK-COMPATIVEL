@@ -5,6 +5,7 @@ import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
 import android.util.Log
+import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -14,6 +15,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
+import com.google.android.material.bottomsheet.BottomSheetDialog
 import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
@@ -241,7 +243,6 @@ class SeriesDetailsActivity : AppCompatActivity() {
                                         .load("https://image.tmdb.org/t/p/w1280$backdropPath")
                                         .centerCrop().into(imgBackground)
                                 }
-                                // Mantém poster vertical
                                 Glide.with(this@SeriesDetailsActivity).load(seriesIcon).placeholder(R.mipmap.ic_launcher).centerCrop().into(imgPoster)
                             }
                         }
@@ -341,14 +342,79 @@ class SeriesDetailsActivity : AppCompatActivity() {
             })
     }
 
+    // =========================================================================
+    // NOVA FUNÇÃO: SELETOR DE TEMPORADA CENTRALIZADO E TRANSPARENTE (ESTILO OVERLAY)
+    // =========================================================================
     private fun mostrarSeletorDeTemporada() {
         if (sortedSeasons.isEmpty()) return
-        val nomes = sortedSeasons.map { "Temporada $it" }.toTypedArray()
-        AlertDialog.Builder(this)
-            .setTitle("Escolha a Temporada")
-            .setItems(nomes) { _, which -> mudarTemporada(sortedSeasons[which]) }
-            .show()
+
+        // R.style.DialogTemporadaTransparente deve estar no seu themes.xml
+        val dialog = BottomSheetDialog(this, R.style.DialogTemporadaTransparente)
+        
+        val root = LinearLayout(this)
+        root.layoutParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        )
+        root.gravity = Gravity.CENTER_HORIZONTAL
+        root.setPadding(0, 50, 0, 50)
+        root.setBackgroundColor(Color.TRANSPARENT)
+
+        val rvSeasons = RecyclerView(this)
+        // Coluna centralizada com 250dp de largura
+        val rvParams = LinearLayout.LayoutParams(250.toPx(), LinearLayout.LayoutParams.WRAP_CONTENT)
+        rvSeasons.layoutParams = rvParams
+        rvSeasons.layoutManager = LinearLayoutManager(this)
+        rvSeasons.setBackgroundColor(Color.TRANSPARENT)
+
+        rvSeasons.adapter = object : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
+            override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
+                val tv = TextView(parent.context)
+                tv.layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+                tv.setPadding(20, 35, 20, 35)
+                tv.gravity = Gravity.CENTER
+                tv.textSize = 22f
+                tv.setTextColor(Color.WHITE)
+                tv.isFocusable = true
+                tv.isClickable = true
+                return object : RecyclerView.ViewHolder(tv) {}
+            }
+
+            override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
+                val season = sortedSeasons[position]
+                val tv = holder.itemView as TextView
+                tv.text = "Temporada $season"
+                
+                tv.setOnFocusChangeListener { v, hasFocus ->
+                    if (hasFocus) {
+                        v.setBackgroundColor(Color.parseColor("#FFD700")) // Amarelo Ouro
+                        (v as TextView).setTextColor(Color.BLACK)
+                        v.animate().scaleX(1.1f).scaleY(1.1f).setDuration(150).start()
+                    } else {
+                        v.setBackgroundColor(Color.TRANSPARENT)
+                        (v as TextView).setTextColor(Color.WHITE)
+                        v.animate().scaleX(1.0f).scaleY(1.0f).setDuration(150).start()
+                    }
+                }
+
+                tv.setOnClickListener {
+                    mudarTemporada(season)
+                    dialog.dismiss()
+                }
+            }
+            override fun getItemCount() = sortedSeasons.size
+        }
+
+        root.addView(rvSeasons)
+        dialog.setContentView(root)
+        dialog.show()
+        
+        rvSeasons.postDelayed({
+            rvSeasons.findViewHolderForAdapterPosition(0)?.itemView?.requestFocus()
+        }, 150)
     }
+
+    private fun Int.toPx(): Int = (this * resources.displayMetrics.density).toInt()
 
     private fun mudarTemporada(seasonKey: String) {
         currentSeason = seasonKey
@@ -376,9 +442,6 @@ class SeriesDetailsActivity : AppCompatActivity() {
         }
     }
 
-    // =========================================================================
-    //  ATENÇÃO: LÓGICA DO PLAYER E BOTÃO "PRÓXIMO" REVISADA E BLINDADA
-    // =========================================================================
     private fun abrirPlayer(ep: EpisodeStream, usarResume: Boolean) {
         val streamId = ep.id.toIntOrNull() ?: 0
         val ext = ep.container_extension ?: "mp4"
@@ -386,12 +449,10 @@ class SeriesDetailsActivity : AppCompatActivity() {
         val lista = episodesBySeason[currentSeason] ?: emptyList()
         val position = lista.indexOfFirst { it.id == ep.id }
         
-        // 1. Encontra o próximo episódio para o botão "Próximo"
         val nextEp = if (position + 1 < lista.size) lista[position + 1] else null
         val nextStreamId = nextEp?.id?.toIntOrNull() ?: 0
         val nextChannelName = nextEp?.let { "T${currentSeason}E${it.episode_num} - $seriesName" }
 
-        // 2. Cria a "Mochila" (Lista Completa) para o Player
         val mochilaIds = ArrayList<Int>()
         for (item in lista) {
             val idInt = item.id.toIntOrNull() ?: 0
@@ -410,14 +471,12 @@ class SeriesDetailsActivity : AppCompatActivity() {
         intent.putExtra("stream_type", "series")
         intent.putExtra("channel_name", "T${currentSeason}E${ep.episode_num} - $seriesName")
         
-        // 3. Passa a Mochila (Isso é crucial para o botão Próximo funcionar)
         if (mochilaIds.isNotEmpty()) {
             intent.putIntegerArrayListExtra("episode_list", mochilaIds)
         }
 
         if (existe) intent.putExtra("start_position_ms", pos)
         
-        // 4. Passa os dados do próximo episódio
         if (nextStreamId != 0) {
             intent.putExtra("next_stream_id", nextStreamId)
             if (nextChannelName != null) intent.putExtra("next_channel_name", nextChannelName)
@@ -430,21 +489,15 @@ class SeriesDetailsActivity : AppCompatActivity() {
         val prefs = getSharedPreferences("vltv_prefs", Context.MODE_PRIVATE)
         val user = prefs.getString("username", "") ?: ""
         val pass = prefs.getString("password", "") ?: ""
-
-        val serverList = listOf("http://tvblack.shop", "http://firewallnaousardns.xyz:80", "http://fibercdn.sbs")
-        val server = serverList.first()
+        val server = "http://tvblack.shop"
 
         val eid = ep.id.toIntOrNull() ?: 0
         val ext = ep.container_extension ?: "mp4"
 
-        return montarUrlStream(server, "series", user, pass, eid, ext)
-    }
-
-    private fun montarUrlStream(server: String, streamType: String, user: String, pass: String, id: Int, ext: String): String {
         var base = if (server.endsWith("/")) server.dropLast(1) else server
         if (!base.startsWith("http")) base = "http://$base"
         val output = if (ext.isEmpty()) "ts" else ext
-        return "$base/get.php?username=$user&password=$pass&type=$streamType&output=$output&id=$id"
+        return "$base/get.php?username=$user&password=$pass&type=series&output=$output&id=$eid"
     }
 
     private fun baixarTemporadaAtual(lista: List<EpisodeStream>) {
