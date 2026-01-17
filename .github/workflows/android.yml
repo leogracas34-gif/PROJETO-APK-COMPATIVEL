@@ -1,4 +1,5 @@
-name: Android Build Oficial (Final Definitivo)
+
+name: Android Build
 
 on:
   push:
@@ -23,46 +24,11 @@ jobs:
       with:
         gradle-version: '8.2'
         
-    # 1. Gera o APK e o AAB
-    - name: Build Release App
-      run: gradle bundleRelease assembleRelease -x lint --stacktrace
+    - name: Build with Gradle (Direct)
+      run: gradle assembleDebug --stacktrace
 
-    # 2. O TRUQUE: Instala a versão antiga da ferramenta que o assinador exige
-    - name: Install Build Tools 29.0.3
-      run: echo "y" | sudo $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "build-tools;29.0.3"
-
-    # 3. Assina o AAB (Bundle) - Voltamos para o r0adkll clássico
-    - name: Assinar AAB (Bundle)
-      uses: r0adkll/sign-android-release@v1
-      id: sign_aab
-      with:
-        releaseDirectory: app/build/outputs/bundle/release
-        signingKeyBase64: ${{ secrets.SIGNING_KEY }}
-        alias: ${{ secrets.ALIAS }}
-        keyStorePassword: ${{ secrets.KEY_STORE_PASSWORD }}
-        keyPassword: ${{ secrets.KEY_PASSWORD }}
-
-    # 4. Assina o APK (Instalador) - Voltamos para o r0adkll clássico
-    - name: Assinar APK (Instalador)
-      uses: r0adkll/sign-android-release@v1
-      id: sign_apk
-      with:
-        releaseDirectory: app/build/outputs/apk/release
-        signingKeyBase64: ${{ secrets.SIGNING_KEY }}
-        alias: ${{ secrets.ALIAS }}
-        keyStorePassword: ${{ secrets.KEY_STORE_PASSWORD }}
-        keyPassword: ${{ secrets.KEY_PASSWORD }}
-
-    # 5. Upload do AAB Assinado
-    - name: Download AAB (Play Store)
+    - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
-        name: VLTV-Play-PlayStore-AAB
-        path: ${{ steps.sign_aab.outputs.signedReleaseFile }}
-
-    # 6. Upload do APK Assinado
-    - name: Download APK (Instalador TV e Celular)
-      uses: actions/upload-artifact@v4
-      with:
-        name: VLTV-Play-Instalador-APK
-        path: ${{ steps.sign_apk.outputs.signedReleaseFile }}
+        name: app-debug
+        path: app/build/outputs/apk/debug/app-debug.apk
