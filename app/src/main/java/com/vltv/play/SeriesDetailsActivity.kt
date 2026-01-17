@@ -348,21 +348,24 @@ class SeriesDetailsActivity : AppCompatActivity() {
     private fun mostrarSeletorDeTemporada() {
         if (sortedSeasons.isEmpty()) return
 
-        // R.style.DialogTemporadaTransparente deve estar no seu themes.xml
+        // Usamos o estilo transparente definido no themes.xml
         val dialog = BottomSheetDialog(this, R.style.DialogTemporadaTransparente)
         
+        // Layout principal
         val root = LinearLayout(this)
         root.layoutParams = LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
             LinearLayout.LayoutParams.WRAP_CONTENT
         )
+        root.orientation = LinearLayout.VERTICAL
         root.gravity = Gravity.CENTER_HORIZONTAL
-        root.setPadding(0, 50, 0, 50)
+        root.setPadding(0, 30, 0, 30)
         root.setBackgroundColor(Color.TRANSPARENT)
 
+        // RecyclerView com altura limitada para permitir o scroll
         val rvSeasons = RecyclerView(this)
-        // Coluna centralizada com 250dp de largura
-        val rvParams = LinearLayout.LayoutParams(250.toPx(), LinearLayout.LayoutParams.WRAP_CONTENT)
+        // Definimos uma largura fixa (250dp) e uma altura máxima (ex: 400dp) para a coluna
+        val rvParams = LinearLayout.LayoutParams(250.toPx(), 400.toPx()) 
         rvSeasons.layoutParams = rvParams
         rvSeasons.layoutManager = LinearLayoutManager(this)
         rvSeasons.setBackgroundColor(Color.TRANSPARENT)
@@ -405,15 +408,49 @@ class SeriesDetailsActivity : AppCompatActivity() {
             override fun getItemCount() = sortedSeasons.size
         }
 
+        // Botão Fechar no rodapé da coluna
+        val btnClose = TextView(this)
+        val closeParams = LinearLayout.LayoutParams(250.toPx(), ViewGroup.LayoutParams.WRAP_CONTENT)
+        closeParams.setMargins(0, 20, 0, 20)
+        btnClose.layoutParams = closeParams
+        btnClose.text = "✕ FECHAR"
+        btnClose.gravity = Gravity.CENTER
+        btnClose.setTextColor(Color.WHITE)
+        btnClose.setPadding(0, 25, 0, 25)
+        btnClose.isFocusable = true
+        btnClose.isClickable = true
+
+        btnClose.setOnFocusChangeListener { v, hasFocus ->
+            if (hasFocus) {
+                (v as TextView).setTextColor(Color.RED)
+                v.setBackgroundColor(Color.parseColor("#33000000"))
+            } else {
+                (v as TextView).setTextColor(Color.WHITE)
+                v.setBackgroundColor(Color.TRANSPARENT)
+            }
+        }
+        btnClose.setOnClickListener { dialog.dismiss() }
+
         root.addView(rvSeasons)
+        root.addView(btnClose)
+
         dialog.setContentView(root)
+
+        // Configura o comportamento para não expandir para o topo automaticamente
+        val bottomSheet = dialog.findViewById<View>(com.google.android.material.R.id.design_bottom_sheet)
+        bottomSheet?.let {
+            val behavior = com.google.android.material.bottomsheet.BottomSheetBehavior.from(it)
+            // Mantém a altura que definirmos no layout, sem forçar tela cheia
+            behavior.peekHeight = 500.toPx() 
+            it.setBackgroundColor(Color.TRANSPARENT)
+        }
+
         dialog.show()
         
         rvSeasons.postDelayed({
             rvSeasons.findViewHolderForAdapterPosition(0)?.itemView?.requestFocus()
         }, 150)
     }
-
     private fun Int.toPx(): Int = (this * resources.displayMetrics.density).toInt()
 
     private fun mudarTemporada(seasonKey: String) {
