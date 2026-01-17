@@ -22,6 +22,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.engine.DiskCacheStrategy
+import com.bumptech.glide.Priority
 import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
@@ -50,9 +51,9 @@ class VodActivity : AppCompatActivity() {
         setContentView(R.layout.activity_live_tv)
         val windowInsetsController = WindowCompat.getInsetsController(window,
         window.decorView)
-        windowInsetsController.systemBarsBehavior =
+        windowInsetsController?.systemBarsBehavior =
         WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-        windowInsetsController.hide(WindowInsetsCompat.Type.systemBars())
+        windowInsetsController?.hide(WindowInsetsCompat.Type.systemBars())
 
         rvCategories = findViewById(R.id.rvCategories)
         rvMovies = findViewById(R.id.rvChannels)
@@ -460,9 +461,13 @@ class VodActivity : AppCompatActivity() {
             val item = list[position]
             holder.tvName.text = item.name
 
+            // ✅ OTIMIZAÇÃO DE CAPAS VOD: Para carregar instantâneo e não quebrar
             Glide.with(holder.itemView.context)
                 .load(item.icon)
-                .diskCacheStrategy(DiskCacheStrategy.AUTOMATIC)
+                .diskCacheStrategy(DiskCacheStrategy.ALL)
+                .override(200, 300) // Redimensiona para posters verticais
+                .thumbnail(0.1f)
+                .priority(Priority.HIGH)
                 .placeholder(R.drawable.bg_logo_placeholder)
                 .error(R.drawable.bg_logo_placeholder)
                 .centerCrop()
@@ -471,8 +476,17 @@ class VodActivity : AppCompatActivity() {
             holder.itemView.isFocusable = true
             holder.itemView.isClickable = true
 
-            holder.itemView.setOnFocusChangeListener { _, hasFocus ->
-                holder.itemView.alpha = if (hasFocus) 1.0f else 0.8f
+            holder.itemView.setOnFocusChangeListener { view, hasFocus ->
+                // ✅ EFEITO VISUAL TV BOX: Zoom + Brilho ao focar
+                if (hasFocus) {
+                    view.animate().scaleX(1.1f).scaleY(1.1f).setDuration(150).start()
+                    holder.tvName.setTextColor(0xFF00C6FF.toInt()) // Azul Neon
+                    view.alpha = 1.0f
+                } else {
+                    view.animate().scaleX(1.0f).scaleY(1.0f).setDuration(150).start()
+                    holder.tvName.setTextColor(0xFFFFFFFF.toInt())
+                    view.alpha = 0.8f
+                }
             }
 
             holder.itemView.setOnClickListener { onClick(item) }
