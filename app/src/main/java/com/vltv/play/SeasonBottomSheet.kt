@@ -7,13 +7,12 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.view.Window
-import android.view.WindowManager
+import android.widget.ImageButton
 import android.widget.TextView
 import androidx.cardview.widget.CardView
 import androidx.fragment.app.DialogFragment
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-// Importante: R do seu pacote
 import com.vltv.play.R 
 
 class SeasonBottomSheet(
@@ -23,7 +22,6 @@ class SeasonBottomSheet(
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // Usa um tema translúcido para garantir que não haja bordas ou títulos
         setStyle(STYLE_NO_TITLE, android.R.style.Theme_Translucent_NoTitleBar)
     }
 
@@ -32,25 +30,17 @@ class SeasonBottomSheet(
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View? {
-        // Infla o nosso layout que tem o fundo escurecido transparente
         val view = inflater.inflate(R.layout.layout_season_sheet, container, false)
-        
-        // Remove qualquer fundo padrão da janela do Dialog
         dialog?.window?.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
         dialog?.window?.requestFeature(Window.FEATURE_NO_TITLE)
-        
         return view
     }
 
-    // --- CORREÇÃO PRINCIPAL AQUI ---
     override fun onStart() {
         super.onStart()
-        // Força a janela a ocupar a tela inteira e ser transparente
         dialog?.window?.let { window ->
             window.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
             window.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
-            
-            // Remove o "Dim" padrão do Android para usar apenas o nosso do XML
             val params = window.attributes
             params.dimAmount = 0f
             window.attributes = params
@@ -67,8 +57,20 @@ class SeasonBottomSheet(
             dismiss()
         }
         
-        // Fecha se clicar na parte escura (fundo)
-        view.setOnClickListener { dismiss() }
+        // Configura o botão X para fechar
+        val btnClose = view.findViewById<ImageButton>(R.id.btnClose)
+        btnClose.setOnClickListener { dismiss() }
+        
+        // Efeito de foco no botão X
+        btnClose.setOnFocusChangeListener { v, hasFocus ->
+            if (hasFocus) {
+                v.animate().scaleX(1.2f).scaleY(1.2f).setDuration(150).start()
+                btnClose.setColorFilter(Color.parseColor("#FFD700")) // Amarelo no foco
+            } else {
+                v.animate().scaleX(1.0f).scaleY(1.0f).setDuration(150).start()
+                btnClose.setColorFilter(Color.WHITE)
+            }
+        }
     }
 
     inner class SeasonAdapter(
@@ -92,18 +94,20 @@ class SeasonBottomSheet(
             
             holder.itemView.setOnClickListener { onClick(season) }
 
-            // Lógica de Foco Dourado (Estilo Disney)
+            // LÓGICA DISNEY:
+            // Focado = Fundo Branco, Texto Preto, Maior
+            // Normal = Fundo Transparente, Texto Branco, Normal
             holder.itemView.setOnFocusChangeListener { _, hasFocus ->
                 if (hasFocus) {
-                    holder.card.setCardBackgroundColor(Color.parseColor("#FFD700")) // Amarelo
-                    holder.tv.setTextColor(Color.BLACK) // Texto Preto
-                    holder.card.animate().scaleX(1.1f).scaleY(1.1f).setDuration(150).start()
+                    holder.card.setCardBackgroundColor(Color.WHITE) 
+                    holder.tv.setTextColor(Color.BLACK)
+                    holder.card.animate().scaleX(1.15f).scaleY(1.15f).setDuration(150).start()
                     holder.card.cardElevation = 10f
                 } else {
-                    holder.card.setCardBackgroundColor(Color.parseColor("#333333")) // Cinza do Botão
-                    holder.tv.setTextColor(Color.WHITE) // Texto Branco
+                    holder.card.setCardBackgroundColor(Color.TRANSPARENT) // FICA INVISÍVEL
+                    holder.tv.setTextColor(Color.WHITE)
                     holder.card.animate().scaleX(1.0f).scaleY(1.0f).setDuration(150).start()
-                    holder.card.cardElevation = 4f
+                    holder.card.cardElevation = 0f
                 }
             }
         }
