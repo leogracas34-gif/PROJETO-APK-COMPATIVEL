@@ -5,8 +5,16 @@ import android.content.Intent
 import android.content.res.Configuration
 import android.os.Bundle
 import android.view.KeyEvent
+import android.view.LayoutInflater
+import android.view.MenuItem
+import android.view.View
+import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
+import android.widget.ImageView
+import android.widget.PopupMenu
+import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.WindowCompat
@@ -35,9 +43,9 @@ class HomeActivity : AppCompatActivity() {
 
         val windowInsetsController =
             WindowCompat.getInsetsController(window, window.decorView)
-        windowInsetsController.systemBarsBehavior =
+        windowInsetsController?.systemBarsBehavior =
             WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-        windowInsetsController.hide(WindowInsetsCompat.Type.systemBars())
+        windowInsetsController?.hide(WindowInsetsCompat.Type.systemBars())
 
         // Receiver de downloads
         DownloadHelper.registerReceiver(this)
@@ -69,7 +77,6 @@ class HomeActivity : AppCompatActivity() {
         } catch (e: Exception) {
             e.printStackTrace()
         }
-        // -----------------------------------
     }
 
     private fun setupClicks() {
@@ -77,16 +84,32 @@ class HomeActivity : AppCompatActivity() {
             return packageManager.hasSystemFeature("android.hardware.type.television") ||
                    packageManager.hasSystemFeature("android.software.leanback") ||
                    (resources.configuration.uiMode and
-                   android.content.res.Configuration.UI_MODE_TYPE_MASK) ==
-                   android.content.res.Configuration.UI_MODE_TYPE_TELEVISION
+                   Configuration.UI_MODE_TYPE_MASK) ==
+                   Configuration.UI_MODE_TYPE_TELEVISION
+        }
+
+        // --- MELHORIA: FOCO VISUAL NO CAMPO DE BUSCA (ETSEARCH) ---
+        binding.etSearch.isFocusable = true
+        binding.etSearch.isFocusableInTouchMode = true
+        binding.etSearch.setOnFocusChangeListener { _, hasFocus ->
+            if (hasFocus) {
+                // Efeito Neon Azul ao focar na busca
+                binding.etSearch.setBackgroundResource(R.drawable.bg_login_input_premium) // Usa seu fundo de input azul
+                binding.etSearch.animate().scaleX(1.03f).scaleY(1.03f).setDuration(150).start()
+            } else {
+                binding.etSearch.setBackgroundResource(android.R.drawable.edit_text) // Volta ao padrão
+                binding.etSearch.animate().scaleX(1f).scaleY(1f).setDuration(150).start()
+            }
         }
 
         // Configura Settings (TV + Celular)
         binding.btnSettings.isFocusable = true
         binding.btnSettings.isFocusableInTouchMode = true
         binding.btnSettings.setOnFocusChangeListener { _, hasFocus ->
-            binding.btnSettings.scaleX = if (hasFocus) 1.05f else 1f
-            binding.btnSettings.scaleY = if (hasFocus) 1.05f else 1f
+            binding.btnSettings.scaleX = if (hasFocus) 1.15f else 1f
+            binding.btnSettings.scaleY = if (hasFocus) 1.15f else 1f
+            // Brilho azul no ícone de engrenagem
+            binding.btnSettings.setColorFilter(if (hasFocus) 0xFF00C6FF.toInt() else 0xFFFFFFFF.toInt())
         }
 
         // Lista de cards para setup comum
@@ -100,6 +123,8 @@ class HomeActivity : AppCompatActivity() {
             card.setOnFocusChangeListener { _, hasFocus ->
                 card.scaleX = if (hasFocus) 1.05f else 1f
                 card.scaleY = if (hasFocus) 1.05f else 1f
+                // Adiciona um contorno de elevação ao focar
+                card.elevation = if (hasFocus) 20f else 5f
             }
             
             // Clique único (celular + TV ENTER)
@@ -113,32 +138,37 @@ class HomeActivity : AppCompatActivity() {
             }
         }
         
-        // D-PAD NAVEGAÇÃO (só ativa em TV)
+        // D-PAD NAVEGAÇÃO (só ativa em TV) - AJUSTADO PARA NÃO PULAR LATERAIS
         if (isTelevisionDevice()) {
             binding.cardLiveTv.setOnKeyListener { _, keyCode, event ->
-                if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT && 
-                    event.action == KeyEvent.ACTION_DOWN) {
+                if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT && event.action == KeyEvent.ACTION_DOWN) {
                     binding.cardMovies.requestFocus()
+                    true
+                } else if (keyCode == KeyEvent.KEYCODE_DPAD_UP && event.action == KeyEvent.ACTION_DOWN) {
+                    binding.etSearch.requestFocus() // Sobe para a busca
                     true
                 } else false
             }
             
             binding.cardMovies.setOnKeyListener { _, keyCode, event ->
-                if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT && 
-                    event.action == KeyEvent.ACTION_DOWN) {
+                if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT && event.action == KeyEvent.ACTION_DOWN) {
                     binding.cardLiveTv.requestFocus()
                     true
-                } else if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT && 
-                           event.action == KeyEvent.ACTION_DOWN) {
+                } else if (keyCode == KeyEvent.KEYCODE_DPAD_RIGHT && event.action == KeyEvent.ACTION_DOWN) {
                     binding.cardSeries.requestFocus()
+                    true
+                } else if (keyCode == KeyEvent.KEYCODE_DPAD_UP && event.action == KeyEvent.ACTION_DOWN) {
+                    binding.etSearch.requestFocus() // Sobe para a busca
                     true
                 } else false
             }
             
             binding.cardSeries.setOnKeyListener { _, keyCode, event ->
-                if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT && 
-                    event.action == KeyEvent.ACTION_DOWN) {
+                if (keyCode == KeyEvent.KEYCODE_DPAD_LEFT && event.action == KeyEvent.ACTION_DOWN) {
                     binding.cardMovies.requestFocus()
+                    true
+                } else if (keyCode == KeyEvent.KEYCODE_DPAD_UP && event.action == KeyEvent.ACTION_DOWN) {
+                    binding.btnSettings.requestFocus() // Sobe para configurações
                     true
                 } else false
             }
@@ -198,22 +228,13 @@ class HomeActivity : AppCompatActivity() {
             .show()
     }
 
-    // --- NOVA LÓGICA: Alterna entre Filmes e Séries e Ajusta para TV ---
     private fun carregarBannerAlternado() {
         val prefs = getSharedPreferences("vltv_home_prefs", Context.MODE_PRIVATE)
-        
-        // 1. Verifica o que mostrou na última vez (Padrão: começa com 'tv')
         val ultimoTipo = prefs.getString("ultimo_tipo_banner", "tv") ?: "tv"
-
-        // 2. Inverte a escolha
         val tipoAtual = if (ultimoTipo == "tv") "movie" else "tv"
-
-        // 3. Salva a escolha atual para a próxima vez
         prefs.edit().putString("ultimo_tipo_banner", tipoAtual).apply()
 
-        // 4. Monta a URL da API
-        val urlString =
-            "https://api.themoviedb.org/3/trending/$tipoAtual/day?api_key=$TMDB_API_KEY&language=pt-BR"
+        val urlString = "https://api.themoviedb.org/3/trending/$tipoAtual/day?api_key=$TMDB_API_KEY&language=pt-BR"
 
         CoroutineScope(Dispatchers.IO).launch {
             try {
@@ -225,35 +246,22 @@ class HomeActivity : AppCompatActivity() {
                     val randomIndex = Random.nextInt(results.length())
                     val item = results.getJSONObject(randomIndex)
 
-                    // 5. Pega o título correto (filme usa 'title', série usa 'name')
-                    val titulo = if (item.has("title"))
-                        item.getString("title")
-                    else if (item.has("name"))
-                        item.getString("name")
-                    else 
-                        "Destaque"
+                    val titulo = if (item.has("title")) item.getString("title")
+                    else if (item.has("name")) item.getString("name")
+                    else "Destaque"
 
-                    val overview = if (item.has("overview"))
-                        item.getString("overview")
-                    else
-                        ""
-
+                    val overview = if (item.has("overview")) item.getString("overview") else ""
                     val backdropPath = item.getString("backdrop_path")
                     val prefixo = if (tipoAtual == "movie") "Filme em Alta: " else "Série em Alta: "
 
                     if (backdropPath != "null" && backdropPath.isNotBlank()) {
-                        
-                        // 6. Usa imagem ORIGINAL (Full HD/4K) para ficar bom na TV
                         val imageUrl = "https://image.tmdb.org/t/p/original$backdropPath"
-
                         withContext(Dispatchers.Main) {
                             binding.tvBannerTitle.text = "$prefixo$titulo"
                             binding.tvBannerOverview.text = overview
-
-                            // 7. Carrega com CenterCrop para preencher a tela inteira sem bordas
                             Glide.with(this@HomeActivity)
                                 .load(imageUrl)
-                                .centerCrop() // O segredo para ajustar à tela da TV
+                                .centerCrop()
                                 .placeholder(android.R.color.black)
                                 .into(binding.imgBanner)
                         }
