@@ -19,13 +19,14 @@
     </style>
 
     <style name="DialogTemporadaTransparente" parent="Theme.Design.Light.BottomSheetDialog">
-        <item name="bottomSheetStyle">@style/TransparentBottomSheetContent</item>
+        <item name="bottomSheetStyle">@style/FundoInvisivelContent</item>
         <item name="android:windowBackground">@android:color/transparent</item>
         <item name="android:colorBackground">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:backgroundDimEnabled">true</item>
     </style>
 
-    <style name="TransparentBottomSheetContent" parent="Widget.Design.BottomSheet.Modal">
+    <style name="FundoInvisivelContent" parent="Widget.Design.BottomSheet.Modal">
         <item name="android:background">@android:color/transparent</item>
     </style>
     
