@@ -3,7 +3,6 @@ package com.vltv.play
 import android.content.Context
 import android.content.Intent
 import android.graphics.Color
-import android.media.audiofx.LoudnessEnhancer
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
@@ -380,19 +379,9 @@ class PlayerActivity : AppCompatActivity() {
             .setLoadControl(loadControl)
             .build()
             
-        // --- AQUI ESTÁ A CORREÇÃO DE VOLUME (BOOST) ---
-        try {
-            val audioSessionId = player?.audioSessionId
-            if (audioSessionId != null && audioSessionId != 0) {
-                val loudnessEnhancer = LoudnessEnhancer(audioSessionId)
-                // 1500 mB = um ganho considerável para TVs
-                loudnessEnhancer.setTargetGain(1500)
-                loudnessEnhancer.enabled = true
-            }
-        } catch (e: Exception) {
-            Log.e("AudioBoost", "Falha ao iniciar LoudnessEnhancer: ${e.message}")
-        }
-        // ---------------------------------------------
+        // --- FUNÇÃO DE AUDIO BOOST REMOVIDA AQUI PARA EVITAR CRASH ---
+        // O áudio agora é gerenciado nativamente pelo ExoPlayer (Igual ao Antigo)
+        // -------------------------------------------------------------
 
         playerView.player = player
 
