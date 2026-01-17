@@ -21,6 +21,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.engine.DiskCacheStrategy
+import com.bumptech.glide.Priority
 import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
@@ -50,8 +51,8 @@ class LiveTvActivity : AppCompatActivity() {
         setContentView(R.layout.activity_live_tv)
 
         val windowInsetsController = WindowCompat.getInsetsController(window, window.decorView)
-        windowInsetsController.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-        windowInsetsController.hide(WindowInsetsCompat.Type.systemBars())
+        windowInsetsController?.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        windowInsetsController?.hide(WindowInsetsCompat.Type.systemBars())
 
         rvCategories = findViewById(R.id.rvCategories)
         rvChannels = findViewById(R.id.rvChannels)
@@ -71,7 +72,7 @@ class LiveTvActivity : AppCompatActivity() {
         rvCategories.isFocusable = true
         rvCategories.descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
 
-        // Mantendo o GridLayoutManager (5 colunas) como você pediu
+        // Mantendo o GridLayoutManager (4 colunas) como você pediu
         rvChannels.layoutManager = GridLayoutManager(this, 4)
         rvChannels.isFocusable = true
         rvChannels.descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
@@ -328,12 +329,16 @@ class LiveTvActivity : AppCompatActivity() {
 
             holder.tvName.text = item.name
 
+            // MELHORIA DE CARREGAMENTO DAS CAPAS APLICADA AQUI
             Glide.with(holder.itemView.context)
                 .load(item.icon)
-                .diskCacheStrategy(DiskCacheStrategy.AUTOMATIC)
+                .diskCacheStrategy(DiskCacheStrategy.ALL)
+                .override(160, 160)
+                .priority(Priority.HIGH)
+                .thumbnail(0.1f)
                 .placeholder(R.drawable.bg_logo_placeholder)
                 .error(R.drawable.bg_logo_placeholder)
-                .centerCrop()
+                .centerInside()
                 .into(holder.imgLogo)
 
             // Chamada do EPG corrigida
