@@ -15,6 +15,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.engine.DiskCacheStrategy
+import com.bumptech.glide.Priority
 import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
@@ -44,11 +45,9 @@ class SeriesActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_live_tv)
 
-        val windowInsetsController = WindowCompat.getInsetsController(window,
-        window.decorView)
-        windowInsetsController.systemBarsBehavior =
-        WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-        windowInsetsController.hide(WindowInsetsCompat.Type.systemBars())
+        val windowInsetsController = WindowCompat.getInsetsController(window, window.decorView)
+        windowInsetsController?.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        windowInsetsController?.hide(WindowInsetsCompat.Type.systemBars())
 
         rvCategories = findViewById(R.id.rvCategories)
         rvSeries = findViewById(R.id.rvChannels)
@@ -353,9 +352,13 @@ class SeriesActivity : AppCompatActivity() {
             val item = list[position]
             holder.tvName.text = item.name
 
+            // MELHORIA DE CAPAS: Otimizado para TV Box antiga
             Glide.with(holder.itemView.context)
                 .load(item.icon)
-                .diskCacheStrategy(DiskCacheStrategy.AUTOMATIC)
+                .diskCacheStrategy(DiskCacheStrategy.ALL)
+                .override(200, 300) // Redimensiona para economizar memória
+                .thumbnail(0.1f)
+                .priority(Priority.HIGH)
                 .placeholder(R.drawable.bg_logo_placeholder)
                 .error(R.drawable.bg_logo_placeholder)
                 .centerCrop()
@@ -364,8 +367,15 @@ class SeriesActivity : AppCompatActivity() {
             holder.itemView.isFocusable = true
             holder.itemView.isClickable = true
 
-            holder.itemView.setOnFocusChangeListener { _, hasFocus ->
-                holder.itemView.alpha = if (hasFocus) 1.0f else 0.8f
+            holder.itemView.setOnFocusChangeListener { view, hasFocus ->
+                // Adicionado efeito visual de foco para TV Box
+                if (hasFocus) {
+                    view.animate().scaleX(1.1f).scaleY(1.1f).setDuration(150).start()
+                    holder.tvName.setTextColor(0xFF00C6FF.toInt()) // Azul Neon ao focar
+                } else {
+                    view.animate().scaleX(1.0f).scaleY(1.0f).setDuration(150).start()
+                    holder.tvName.setTextColor(0xFFFFFFFF.toInt())
+                }
             }
 
             holder.itemView.setOnClickListener { onClick(item) }
