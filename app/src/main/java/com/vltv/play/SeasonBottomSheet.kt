@@ -22,7 +22,8 @@ class SeasonBottomSheet(
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setStyle(STYLE_NO_TITLE, android.R.style.Theme_Translucent_NoTitleBar)
+        // Tema transparente para não criar molduras cinzas
+        setStyle(STYLE_NO_TITLE, android.R.style.Theme_Translucent_NoTitleBar_Fullscreen)
     }
 
     override fun onCreateView(
@@ -42,7 +43,7 @@ class SeasonBottomSheet(
             window.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
             window.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
             val params = window.attributes
-            params.dimAmount = 0f
+            params.dimAmount = 0f // Remove o escurecimento padrão do sistema
             window.attributes = params
         }
     }
@@ -57,18 +58,14 @@ class SeasonBottomSheet(
             dismiss()
         }
         
-        // Configura o botão X para fechar
         val btnClose = view.findViewById<ImageButton>(R.id.btnClose)
-        btnClose.setOnClickListener { dismiss() }
+        btnClose?.setOnClickListener { dismiss() }
         
-        // Efeito de foco no botão X
-        btnClose.setOnFocusChangeListener { v, hasFocus ->
+        btnClose?.setOnFocusChangeListener { v, hasFocus ->
             if (hasFocus) {
                 v.animate().scaleX(1.2f).scaleY(1.2f).setDuration(150).start()
-                btnClose.setColorFilter(Color.parseColor("#FFD700")) // Amarelo no foco
             } else {
                 v.animate().scaleX(1.0f).scaleY(1.0f).setDuration(150).start()
-                btnClose.setColorFilter(Color.WHITE)
             }
         }
     }
@@ -94,20 +91,17 @@ class SeasonBottomSheet(
             
             holder.itemView.setOnClickListener { onClick(season) }
 
-            // LÓGICA DISNEY:
-            // Focado = Fundo Branco, Texto Preto, Maior
-            // Normal = Fundo Transparente, Texto Branco, Normal
             holder.itemView.setOnFocusChangeListener { _, hasFocus ->
                 if (hasFocus) {
+                    // Estilo Disney: Fundo branco e Texto preto no foco
                     holder.card.setCardBackgroundColor(Color.WHITE) 
                     holder.tv.setTextColor(Color.BLACK)
                     holder.card.animate().scaleX(1.15f).scaleY(1.15f).setDuration(150).start()
-                    holder.card.cardElevation = 10f
                 } else {
-                    holder.card.setCardBackgroundColor(Color.TRANSPARENT) // FICA INVISÍVEL
+                    // Estilo Disney: Transparente e Texto branco quando fora de foco
+                    holder.card.setCardBackgroundColor(Color.TRANSPARENT)
                     holder.tv.setTextColor(Color.WHITE)
                     holder.card.animate().scaleX(1.0f).scaleY(1.0f).setDuration(150).start()
-                    holder.card.cardElevation = 0f
                 }
             }
         }
