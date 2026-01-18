@@ -46,6 +46,13 @@ class VodActivity : AppCompatActivity() {
     private var categoryAdapter: VodCategoryAdapter? = null
     private var moviesAdapter: VodAdapter? = null
 
+    // Função para checar se é TV Box ou Celular
+    private fun isTelevision(context: Context): Boolean {
+        val uiMode = context.resources.configuration.uiMode
+        return (uiMode and android.content.res.Configuration.UI_MODE_TYPE_MASK) == 
+                android.content.res.Configuration.UI_MODE_TYPE_TELEVISION
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_live_tv)
@@ -461,17 +468,32 @@ class VodActivity : AppCompatActivity() {
             val item = list[position]
             holder.tvName.text = item.name
 
-            // ✅ OTIMIZAÇÃO DE CAPAS VOD: Para carregar instantâneo e não quebrar
-            Glide.with(holder.itemView.context)
-                .load(item.icon)
-                .diskCacheStrategy(DiskCacheStrategy.ALL)
-                .override(200, 300) // Redimensiona para posters verticais
-                .thumbnail(0.1f)
-                .priority(Priority.HIGH)
-                .placeholder(R.drawable.bg_logo_placeholder)
-                .error(R.drawable.bg_logo_placeholder)
-                .centerCrop()
-                .into(holder.imgPoster)
+            // ✅ LÓGICA DE CAPAS INTELIGENTES (CELULAR VS TV BOX)
+            val context = holder.itemView.context
+            if (isTelevision(context)) {
+                // Modo TV Box: Otimizado para carregar rápido e não travar (usa miniatura primeiro)
+                Glide.with(context)
+                    .load(item.icon)
+                    .diskCacheStrategy(DiskCacheStrategy.ALL)
+                    .override(200, 300) 
+                    .thumbnail(0.1f) 
+                    .priority(Priority.HIGH)
+                    .placeholder(R.drawable.bg_logo_placeholder)
+                    .error(R.drawable.bg_logo_placeholder)
+                    .centerCrop()
+                    .into(holder.imgPoster)
+            } else {
+                // Modo Celular: Carrega 100% da qualidade direto (sem efeito embaçado)
+                Glide.with(context)
+                    .load(item.icon)
+                    .diskCacheStrategy(DiskCacheStrategy.ALL)
+                    .override(com.bumptech.glide.request.target.Target.SIZE_ORIGINAL) 
+                    .priority(Priority.IMMEDIATE)
+                    .placeholder(R.drawable.bg_logo_placeholder)
+                    .error(R.drawable.bg_logo_placeholder)
+                    .centerCrop()
+                    .into(holder.imgPoster)
+            }
 
             holder.itemView.isFocusable = true
             holder.itemView.isClickable = true
