@@ -100,7 +100,9 @@
         <Button
             android:id="@+id/btnLogin"
             android:layout_width="match_parent"
-            android:layout_height="56dp"
+            android:layout_height="60dp"
+            android:layout_marginTop="10dp"
+            android:layout_marginBottom="5dp"
             android:background="@drawable/selector_button_premium"
             android:backgroundTint="@null"
             app:backgroundTint="@null"
@@ -108,7 +110,7 @@
             android:textColor="#FFFFFF"
             android:textSize="18sp"
             android:textStyle="bold"
-            android:elevation="4dp"
+            android:elevation="8dp"
             android:stateListAnimator="@null"/>
 
         <ProgressBar
