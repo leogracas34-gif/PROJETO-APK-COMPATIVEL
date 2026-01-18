@@ -2,26 +2,32 @@ package com.vltv.play
 
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
+import android.content.res.Configuration
 import android.os.Bundle
+import android.view.KeyEvent
 import android.view.LayoutInflater
+import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
+import android.widget.PopupMenu
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import com.bumptech.glide.Glide
-import com.bumptech.glide.load.engine.DiskCacheStrategy
-import com.bumptech.glide.Priority
-import retrofit2.Call
-import retrofit2.Callback
-import retrofit2.Response
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import com.bumptech.glide.Glide
+import com.bumptech.glide.load.engine.DiskCacheStrategy
+import com.bumptech.glide.Priority
+import com.bumptech.glide.request.target.Target
+import retrofit2.Call
+import retrofit2.Callback
+import retrofit2.Response
 
 class SeriesActivity : AppCompatActivity() {
 
@@ -40,6 +46,12 @@ class SeriesActivity : AppCompatActivity() {
 
     private var categoryAdapter: SeriesCategoryAdapter? = null
     private var seriesAdapter: SeriesAdapter? = null
+
+    // ✅ FUNÇÃO PARA DETECTAR SE É TV BOX OU CELULAR
+    private fun isTelevision(context: Context): Boolean {
+        val uiMode = context.resources.configuration.uiMode
+        return (uiMode and Configuration.UI_MODE_TYPE_MASK) == Configuration.UI_MODE_TYPE_TELEVISION
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -111,7 +123,6 @@ class SeriesActivity : AppCompatActivity() {
 
                         cachedCategories = categorias
 
-                        // se controle parental ligado, remove categorias adultas
                         if (ParentalControlManager.isEnabled(this@SeriesActivity)) {
                             categorias = categorias.filterNot { cat ->
                                 isAdultName(cat.name)
@@ -120,21 +131,13 @@ class SeriesActivity : AppCompatActivity() {
 
                         aplicarCategorias(categorias)
                     } else {
-                        Toast.makeText(
-                            this@SeriesActivity,
-                            "Erro ao carregar categorias",
-                            Toast.LENGTH_SHORT
-                        ).show()
+                        Toast.makeText(this@SeriesActivity, "Erro ao carregar categorias", Toast.LENGTH_SHORT).show()
                     }
                 }
 
                 override fun onFailure(call: Call<List<LiveCategory>>, t: Throwable) {
                     progressBar.visibility = View.GONE
-                    Toast.makeText(
-                        this@SeriesActivity,
-                        "Falha de conexão",
-                        Toast.LENGTH_SHORT
-                    ).show()
+                    Toast.makeText(this@SeriesActivity, "Falha de conexão", Toast.LENGTH_SHORT).show()
                 }
             })
     }
@@ -352,26 +355,40 @@ class SeriesActivity : AppCompatActivity() {
             val item = list[position]
             holder.tvName.text = item.name
 
-            // MELHORIA DE CAPAS: Otimizado para TV Box antiga
-            Glide.with(holder.itemView.context)
-                .load(item.icon)
-                .diskCacheStrategy(DiskCacheStrategy.ALL)
-                .override(200, 300) // Redimensiona para economizar memória
-                .thumbnail(0.1f)
-                .priority(Priority.HIGH)
-                .placeholder(R.drawable.bg_logo_placeholder)
-                .error(R.drawable.bg_logo_placeholder)
-                .centerCrop()
-                .into(holder.imgPoster)
+            // ✅ LÓGICA DE CAPAS INTELIGENTES (CELULAR VS TV BOX)
+            val context = holder.itemView.context
+            if (isTelevision(context)) {
+                // Modo TV Box: Otimizado para economizar RAM
+                Glide.with(context)
+                    .load(item.icon)
+                    .diskCacheStrategy(DiskCacheStrategy.ALL)
+                    .override(200, 300) 
+                    .thumbnail(0.1f) 
+                    .priority(Priority.HIGH)
+                    .placeholder(R.drawable.bg_logo_placeholder)
+                    .error(R.drawable.bg_logo_placeholder)
+                    .centerCrop()
+                    .into(holder.imgPoster)
+            } else {
+                // Modo Celular: Alta qualidade direta
+                Glide.with(context)
+                    .load(item.icon)
+                    .diskCacheStrategy(DiskCacheStrategy.ALL)
+                    .override(Target.SIZE_ORIGINAL) 
+                    .priority(Priority.IMMEDIATE)
+                    .placeholder(R.drawable.bg_logo_placeholder)
+                    .error(R.drawable.bg_logo_placeholder)
+                    .centerCrop()
+                    .into(holder.imgPoster)
+            }
 
             holder.itemView.isFocusable = true
             holder.itemView.isClickable = true
 
             holder.itemView.setOnFocusChangeListener { view, hasFocus ->
-                // Adicionado efeito visual de foco para TV Box
                 if (hasFocus) {
                     view.animate().scaleX(1.1f).scaleY(1.1f).setDuration(150).start()
-                    holder.tvName.setTextColor(0xFF00C6FF.toInt()) // Azul Neon ao focar
+                    holder.tvName.setTextColor(0xFF00C6FF.toInt()) 
                 } else {
                     view.animate().scaleX(1.0f).scaleY(1.0f).setDuration(150).start()
                     holder.tvName.setTextColor(0xFFFFFFFF.toInt())
