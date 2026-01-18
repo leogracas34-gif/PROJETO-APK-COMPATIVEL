@@ -59,7 +59,7 @@ class HomeActivity : AppCompatActivity() {
         // Carrega o banner alternado (Filmes / Séries) otimizado para TV
         carregarBannerAlternado()
 
-        // --- CORREÇÃO DO TECLADO E BUSCA ---
+        // --- CORREÇÃO DO TECLADO E BUSCA (RESOLVE O BOTÃO BRANCO) ---
         try {
             // 1. Limpa o texto da busca
             binding.etSearch.setText("")
@@ -67,11 +67,15 @@ class HomeActivity : AppCompatActivity() {
             // 2. Tira o foco da barra de busca
             binding.etSearch.clearFocus()
 
-            // 3. Força o teclado a fechar
+            // 3. RESET DE FUNDO: Remove o estilo de "caixa branca" do Android
+            binding.etSearch.background = null 
+            binding.etSearch.animate().scaleX(1f).scaleY(1f).setDuration(0).start()
+
+            // 4. Força o teclado a fechar
             val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
             imm.hideSoftInputFromWindow(binding.etSearch.windowToken, 0)
 
-            // 4. Joga o foco para o Banner (para não voltar para a busca sozinho)
+            // 5. Joga o foco para o Banner (para não voltar para a busca sozinho)
             binding.cardBanner.requestFocus()
             
         } catch (e: Exception) {
@@ -97,7 +101,8 @@ class HomeActivity : AppCompatActivity() {
                 binding.etSearch.setBackgroundResource(R.drawable.bg_login_input_premium) // Usa seu fundo de input azul
                 binding.etSearch.animate().scaleX(1.03f).scaleY(1.03f).setDuration(150).start()
             } else {
-                binding.etSearch.setBackgroundResource(android.R.drawable.edit_text) // Volta ao padrão
+                // Ao perder o foco, removemos o background para não ficar branco
+                binding.etSearch.background = null
                 binding.etSearch.animate().scaleX(1f).scaleY(1f).setDuration(150).start()
             }
         }
