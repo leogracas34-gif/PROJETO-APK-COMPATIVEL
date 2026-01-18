@@ -106,8 +106,8 @@ class PlayerActivity : AppCompatActivity() {
         setContentView(R.layout.activity_player)
 
         val windowInsetsController = WindowCompat.getInsetsController(window, window.decorView)
-        windowInsetsController.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_BARS_BY_TOUCH
-        windowInsetsController.hide(WindowInsetsCompat.Type.systemBars())
+        windowInsetsController?.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_BARS_BY_TOUCH
+        windowInsetsController?.hide(WindowInsetsCompat.Type.systemBars())
 
         window.decorView.systemUiVisibility =
             View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY or
@@ -125,10 +125,16 @@ class PlayerActivity : AppCompatActivity() {
         tvNextEpisodeTitle = findViewById(R.id.tvNextEpisodeTitle)
         btnPlayNextEpisode = findViewById(R.id.btnPlayNextEpisode)
 
+        // ✅ CORREÇÃO: Foco no botão de próximo
         btnPlayNextEpisode.isFocusable = true
         btnPlayNextEpisode.isFocusableInTouchMode = true
-        btnPlayNextEpisode.setOnFocusChangeListener { _, hasFocus ->
+        btnPlayNextEpisode.setOnFocusChangeListener { view, hasFocus ->
             btnPlayNextEpisode.isSelected = hasFocus
+            if (hasFocus) {
+                view.animate().scaleX(1.1f).scaleY(1.1f).setDuration(150).start()
+            } else {
+                view.animate().scaleX(1.0f).scaleY(1.0f).setDuration(150).start()
+            }
         }
 
         streamId = intent.getIntExtra("stream_id", 0)
@@ -324,7 +330,7 @@ class PlayerActivity : AppCompatActivity() {
 
         // CONFIGURAÇÃO TURBO (Para abrir filmes rápido)
         val isLive = streamType == "live"
-        val minBufferMs = if (isLive) 2000 else 2000
+        val minBufferMs = 2000
         val maxBufferMs = if (isLive) 5000 else 15000
         val playBufferMs = 1000
         val playRebufferMs = 2000
@@ -389,41 +395,31 @@ class PlayerActivity : AppCompatActivity() {
         iniciarPlayer()
     }
 
-    // --- LÓGICA DE CORREÇÃO DO NOME DO EPISÓDIO ---
     private fun abrirProximoEpisodio() {
         if (nextStreamId == 0) return
 
         var novoTitulo = nextChannelName
         val tituloAtual = tvChannelName.text.toString()
 
-        // Se o nome for genérico, calculamos o número
         if (novoTitulo == null || novoTitulo.equals("Próximo Episódio", ignoreCase = true) || novoTitulo == tituloAtual) {
-            
-            // Regex procura: "E02", "E2", "Episodio 02"
             val regex = Regex("(?i)(E|Episódio|Episodio|Episode)\\s*0*(\\d+)")
             val match = regex.find(tituloAtual)
             
             if (match != null) {
                 try {
-                    val textoCompletoEncontrado = match.groupValues[0] // Ex: "E02"
-                    val prefixo = match.groupValues[1] // Ex: "E"
-                    val numeroStr = match.groupValues[2] // Ex: "2"
-                    
+                    val textoCompletoEncontrado = match.groupValues[0] 
+                    val prefixo = match.groupValues[1] 
+                    val numeroStr = match.groupValues[2] 
                     val numeroAtual = numeroStr.toInt()
                     val novoNumero = numeroAtual + 1
-                    
-                    // Mantém o zero na frente se tinha antes (Ex: "03")
                     val novoNumeroStr = if (numeroStr.length > 1 && novoNumero < 10) 
                         "0$novoNumero" else novoNumero.toString()
-                        
-                    // Substitui no texto original: "Lista Negra E02" -> "Lista Negra E03"
                     novoTitulo = tituloAtual.replace(textoCompletoEncontrado, "$prefixo$novoNumeroStr")
-                    
                 } catch (e: Exception) {
-                    novoTitulo = tituloAtual // Falhou, mantém o atual
+                    novoTitulo = tituloAtual 
                 }
             } else {
-                novoTitulo = tituloAtual // Não achou número, mantém o atual
+                novoTitulo = tituloAtual 
             }
         }
 
@@ -431,16 +427,13 @@ class PlayerActivity : AppCompatActivity() {
         intent.putExtra("stream_id", nextStreamId)
         intent.putExtra("stream_ext", "mp4")
         intent.putExtra("stream_type", "series")
-        intent.putExtra("channel_name", novoTitulo) // Usa o nome calculado
-        
+        intent.putExtra("channel_name", novoTitulo) 
         if (episodeList.isNotEmpty()) {
             intent.putIntegerArrayListExtra("episode_list", episodeList)
         }
-        
         startActivity(intent)
         finish()
     }
-    // ----------------------------------------------
 
     private fun getMovieKey(id: Int) = "movie_resume_$id"
 
@@ -511,76 +504,85 @@ class PlayerActivity : AppCompatActivity() {
             return
         }
 
-        val streamIdString = streamId.toString()
-
         XtreamApi.service.getShortEpg(
             user = user,
             pass = pass,
-            streamId = streamIdString,
+            streamId = streamId.toString(),
             limit = 2
         ).enqueue(object : Callback<EpgWrapper> {
-            override fun onResponse(
-                call: Call<EpgWrapper>,
-                response: Response<EpgWrapper>
-            ) {
+            override fun onResponse(call: Call<EpgWrapper>, response: Response<EpgWrapper>) {
                 if (!response.isSuccessful || response.body()?.epg_listings.isNullOrEmpty()) {
                     tvNowPlaying.text = "Sem informação de programação"
                     return
                 }
-
-                val list = response.body()!!.epg_listings!!
-                val epg = list.firstOrNull()
-                if (epg == null || epg.title.isNullOrBlank()) {
-                    tvNowPlaying.text = "Sem informação de programação"
-                    return
-                }
-
+                val epg = response.body()!!.epg_listings!!.firstOrNull() ?: return
                 val titulo = decodeBase64(epg.title)
                 val inicio = epg.start ?: ""
                 val fim = epg.stop ?: epg.end.orEmpty()
-                val textoHora = if (inicio.isNotBlank() && fim.isNotBlank()) {
-                    " ($inicio - $fim)"
-                } else ""
-
-                tvNowPlaying.text = "$titulo$textoHora"
+                tvNowPlaying.text = if (inicio.isNotBlank()) "$titulo ($inicio - $fim)" else titulo
             }
-
             override fun onFailure(call: Call<EpgWrapper>, t: Throwable) {
                 tvNowPlaying.text = "Falha ao carregar programação"
             }
         })
     }
 
-    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-        val p = player ?: return super.onKeyDown(keyCode, event)
-        
-        return when (keyCode) {
-            KeyEvent.KEYCODE_DPAD_LEFT -> {
-                val newPos = (p.currentPosition - 10_000L).coerceAtLeast(0L)
-                p.seekTo(newPos)
-                Toast.makeText(this, "-10s", Toast.LENGTH_SHORT).show()
-                true
-            }
-            KeyEvent.KEYCODE_DPAD_RIGHT -> {
-                val newPos = (p.currentPosition + 10_000L).coerceAtLeast(0L)
-                p.seekTo(newPos)
-                Toast.makeText(this, "+10s", Toast.LENGTH_SHORT).show()
-                true
-            }
-            KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
-                if (nextStreamId != 0 && streamType == "series") {
-                    abrirProximoEpisodio()
-                    true
-                } else {
-                    super.onKeyDown(keyCode, event)
+    // ✅ CORREÇÃO: LÓGICA DO CONTROLE REMOTO (SEM ZOOM, PLAY/PAUSE NO OK)
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        val keyCode = event.keyCode
+        val action = event.action
+        val p = player ?: return super.dispatchKeyEvent(event)
+
+        if (action == KeyEvent.ACTION_DOWN) {
+            when (keyCode) {
+                // ✅ BOTÃO OK: PLAY / PAUSE (E MOSTRA CONTROLES)
+                KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
+                    if (playerView.isControllerFullyVisible) {
+                        if (p.isPlaying) p.pause() else p.play()
+                    } else {
+                        playerView.showController()
+                    }
+                    return true // Bloqueia o Zoom nativo
+                }
+
+                // ✅ SETA PARA BAIXO: FOCA NA BARRA DE PROGRESSO
+                KeyEvent.KEYCODE_DPAD_DOWN -> {
+                    if (!playerView.isControllerFullyVisible) {
+                        playerView.showController()
+                    }
+                    // Foca na SeekBar do Media3 automaticamente
+                    val seekBar = playerView.findViewById<View>(androidx.media3.ui.R.id.exo_progress)
+                    seekBar?.requestFocus()
+                    return true
+                }
+
+                // ✅ SETAS LATERAIS: AVANÇAR / RETROCEDER 10s
+                KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                    if (streamType != "live") {
+                        p.seekTo((p.currentPosition + 10_000L).coerceAtMost(p.duration))
+                        playerView.showController()
+                        return true
+                    }
+                }
+                KeyEvent.KEYCODE_DPAD_LEFT -> {
+                    if (streamType != "live") {
+                        p.seekTo((p.currentPosition - 10_000L).coerceAtLeast(0L))
+                        playerView.showController()
+                        return true
+                    }
                 }
             }
-            KeyEvent.KEYCODE_BACK -> {
-                finish()
-                true
-            }
-            else -> super.onKeyDown(keyCode, event)
         }
+        return super.dispatchKeyEvent(event)
+    }
+
+    // Mantendo seu onKeyDown para o BACK sair corretamente
+    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        if (keyCode == KeyEvent.KEYCODE_BACK) {
+            finish()
+            return true
+        }
+        return super.onKeyDown(keyCode, event)
     }
 
     override fun onPause() {
@@ -608,15 +610,8 @@ class PlayerActivity : AppCompatActivity() {
         player = null
     }
 
-    private fun montarUrlStream(
-        server: String,
-        streamType: String,
-        user: String,
-        pass: String,
-        id: Int,
-        ext: String
-    ): String {
+    private fun montarUrlStream(server: String, streamType: String, user: String, pass: String, id: Int, ext: String): String {
         val base = if (server.endsWith("/")) server.dropLast(1) else server
-        return "$base/$streamType/$user/$pass/$id.$ext"
+        return if (ext.isBlank()) "$base/$streamType/$user/$pass/$id" else "$base/$streamType/$user/$pass/$id.$ext"
     }
 }
