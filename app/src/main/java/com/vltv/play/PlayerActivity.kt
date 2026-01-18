@@ -614,4 +614,22 @@ class PlayerActivity : AppCompatActivity() {
         val base = if (server.endsWith("/")) server.dropLast(1) else server
         return if (ext.isBlank()) "$base/$streamType/$user/$pass/$id" else "$base/$streamType/$user/$pass/$id.$ext"
     }
-}
+
+    // ADICIONE OS NOVOS BLOCOS AQUI, ANTES DA ÚLTIMA CHAVE
+    override fun onStop() {
+        super.onStop()
+        player?.pause() 
+        if (isFinishing) {
+            player?.release()
+            player = null
+        }
+    }
+
+    override fun onBackPressed() {
+        player?.stop()
+        player?.release()
+        player = null
+        super.onBackPressed()
+        finish()
+    }
+} // Esta é a última chave do arquivo
